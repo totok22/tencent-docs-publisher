@@ -1,0 +1,17 @@
+/* Styles for Tencent Docs Publisher */
+
+.tdp-modal-container {
+    padding: 10px;
+}
+
+.tdp-diff-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.tdp-status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}

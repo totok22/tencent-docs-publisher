@@ -1,5 +1,6 @@
 .cache/
 node_modules/
+main.js
 .env
 .env.local
 *.log
