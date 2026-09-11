@@ -1,8 +1,8 @@
 {
   "id": "tencent-docs-publisher",
   "name": "Tencent Docs Publisher",
-  "version": "0.1.13",
-  "minAppVersion": "1.11.4",
+  "version": "0.1.14",
+  "minAppVersion": "1.13.0",
   "description": "Manually publish notes and linked note trees to existing Tencent Docs pages.",
   "author": "totok22",
   "authorUrl": "https://github.com/totok22",

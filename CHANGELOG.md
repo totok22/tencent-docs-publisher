@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-09-11
+
+### Changed
+
+- Declare the settings with Obsidian's declarative settings API, so every option shows up in settings search. This raises `minAppVersion` to 1.13.0.
+- Style destructive buttons with `setDestructive()` instead of the deprecated `setWarning()`.
+- Drop the redundant `README_EN.md` now that `README.md` is the English readme; the language links point at `README.md` and `README_ZH.md`.
+- Fill in release notes automatically when a tag creates a release.
+
+### Fixed
+
+- Refresh the settings tab and the sidebar project list only after you confirm that a project should be removed; both used to re-render as soon as the confirmation dialog opened.
+- Give the settings row that clears the remote page cache a label and description that match what it does; the button used to sit under an unrelated "publish history" row.
+
+## [0.1.13] - 2026-09-11
+
+### Changed
+
+- Add `README_ZH.md` and make `README.md` the English readme, so the plugin directory sees an English description.
+
+### Fixed
+
+- Remove the word "Obsidian" from the plugin description, which the community plugin directory rejects.
+
+## [0.1.12] - 2026-09-11
+
+### Changed
+
+- Reword command names, menus, dialogs and status labels so each one says what it does and what to do next.
+- Split the readme into separate English and Chinese files.
+
 ## [0.1.11] - 2026-09-11
 
 ### Changed
