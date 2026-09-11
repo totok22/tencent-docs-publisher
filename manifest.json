@@ -1,7 +1,7 @@
 {
   "id": "tencent-docs-publisher",
   "name": "Tencent Docs Publisher",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "minAppVersion": "1.11.4",
   "description": "Manually publish Obsidian notes and linked note trees to existing Tencent Docs pages.",
   "author": "totok22",
