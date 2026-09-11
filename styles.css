@@ -15,3 +15,26 @@
     border-radius: 4px;
     font-size: 0.85em;
 }
+
+.tencent-docs-publisher-document-results {
+    max-height: 18rem;
+    overflow: auto;
+    border-inline-start: 2px solid var(--background-modifier-border);
+    padding-inline-start: 0.75rem;
+}
+
+.tencent-docs-publisher-document-results .setting-item,
+.modal.mod-dim .setting-item-description {
+    min-width: 0;
+}
+
+.tencent-docs-publisher-document-results .setting-item-description,
+.setting-item-description .mod-warning {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.setting-item-description .mod-warning {
+    color: var(--text-error);
+    margin-top: 0.25rem;
+}

@@ -1,6 +1,9 @@
 .cache/
+coverage/
 node_modules/
 main.js
+*.map
+data.json
 .env
 .env.local
 *.log

@@ -1,126 +1,60 @@
-# Obsidian → 腾讯文档 同步
+# Tencent Docs Publisher
 
-把仓库里的 Markdown 文档同步到腾讯文档的**智能文档**（smartcanvas）。
-图片会重新上传并嵌入，PDF 等附件自动导入成腾讯文档并在正文里插入链接，
-公式、标题、列表、表格、代码、引用都能保留。
+Tencent Docs Publisher（腾讯文档发布器）是一个 Obsidian 桌面插件，用于把当前 Markdown 或由总览 Markdown 组织的链接树，手动发布到腾讯智能文档的根页面和已有子页面。
 
-> **附：Word 模式（`format: "doc"`）**
->
-> 工具里还留着一种 Word 在线文档格式，它的好处是能把 PDF 显示成**文件卡片**
-> （图标 + 文件名 + 大小 +【查看】按钮），而智能文档只能给超链接——
-> 智能文档的接口没有附件组件，这是格式本身的限制。
-> 当前配置没有启用它；需要的话在 `config.json` 里加一条 `"format": "doc"` 即可，
-> 两种格式可以共存、各写各的目标文档。
+本项目遵循 [DESIGN.md](DESIGN.md) 的实现基线 0.4。Obsidian 是内容源，腾讯文档是展示端；插件不监听保存、不安装 Git 钩子，也不把远端修改自动合并回本地。
 
-## 快速使用
+## 第一版能力
 
-双击 **`一键同步.cmd`**：把「有改动」的文档推上去（没改动会显示跳过）。
+- 单篇笔记或总览链接树的手动预览与发布；
+- 递归发现已有腾讯子页面并保存稳定的 Page ID 绑定；
+- 发布图片与 PDF 引用，只处理发布树实际引用的资源；
+- 增量哈希、远端冲突提示、任务内恢复快照和发布后回读验证；
+- Ctrl+P 命令、文件树/编辑器右键菜单、设置页和发布管理视图；
+- 可选请求智能文档与引用 PDF 全员可读。
 
-命令行方式（参数可叠加）：
+腾讯公开接口目前不支持可靠地创建、移动、重命名或删除智能文档子页面。缺失的子页面需要先在腾讯文档界面中手动创建，再在插件中刷新并绑定。
 
-```bash
-node sync.mjs              # 只同步有改动的条目
-node sync.mjs --all        # 全量重推（忽略改动检测）
-node sync.mjs --only ESF   # 只同步名字/标题里含 ESF 的条目
-node sync.mjs --dry-run    # 只生成 MDX 存到 .cache/，不写入腾讯文档
-node sync.mjs --list       # 查看当前配置了哪些条目
-node sync.mjs --verify     # 回读腾讯文档，确认同步结果（图片/公式/链接数量）
-```
+## 安装与开发
 
-## 配置：config.json
+要求 Obsidian 1.11.4 或更高版本，以及 Node.js 22.12 或更高版本。
 
-每条记录是「本地文件 → 腾讯文档」的映射：
+### 通过 BRAT 安装
 
-```json
-{
-  "docs": [
-    {
-      "name": "安回延时断开 · 设计说明书",
-      "source": "车队/electrical/安回板子与焊接/安回延时断开/设计说明书.md",
-      "target": { "title": "ESF", "fileId": "ZlmJdLpVGKHq" }
-    }
-  ]
-}
-```
+仓库发布到 GitHub 后，可使用 BRAT 1.1.0 或更高版本安装测试版：
 
-| 字段 | 说明 |
-| --- | --- |
-| `name` | 可选，日志里显示的名字 |
-| `source` | 仓库相对路径（相对 Obsidian 仓库根目录） |
-| `format` | 可选，`smartcanvas`（默认，智能文档）或 `doc`（Word 在线文档） |
-| `target.title` | 腾讯文档标题，仅用于显示和按标题查找 |
-| `target.fileId` | 智能文档的 file_id。填了就直接用；不填则按 title 搜索 |
+1. 在 Obsidian 社区插件市场安装并启用 BRAT；
+2. 执行 BRAT 的 “Add a beta plugin for testing” 命令；
+3. 输入公开仓库地址或 `所有者/tencent-docs-publisher`；
+4. 选择最新版本，随后在社区插件列表中启用 Tencent Docs Publisher。
 
-同一个 Markdown 可以同时同步到多个目标（`config.json` 里写多条，`source` 相同、`target` 或 `format` 不同），
-各自的同步状态分开记录，不会互相干扰。
+BRAT 从 GitHub Release 下载 `main.js`、`manifest.json` 和 `styles.css`。因此仓库必须至少发布一个 Release，且 Release 标签、名称和 `manifest.json` 中的版本应完全一致。
 
-**新建目标文档**：需要先有文档，可以在腾讯文档里手动新建一个空的智能文档 / Word 文档，
-或者让 Codex 调用 `manage.create_file` 建好再把 file_id 填进来。
+### 手动安装
 
-`fileId` 最省事的拿法：**不填**，靠 `title` 精确匹配（标题必须和腾讯文档里完全一致）。
-填的话必须是文档的内部 file_id，不是 URL 里那串（两者不通用）。
-查 file_id 可以问 Codex「用 manage.search_file 搜 XXX」，或者在 `--list` 的输出里对照。
+从 GitHub Release 下载 `main.js`、`manifest.json` 和 `styles.css`，放入 Vault 的 `.obsidian/plugins/tencent-docs-publisher/`，然后重新加载 Obsidian 并启用插件。
 
-## 自动触发：git 钩子
-
-双击 **`安装Git钩子.cmd`**（默认装 `post-commit`，即每次 `git commit` 之后自动同步）。
-只处理「本次提交里改动过、且已在 config.json 登记」的文件，后台执行，不阻塞 git。
+### 本地开发
 
 ```bash
-node install-hooks.mjs --hook pre-push   # 改成推送时触发
-node install-hooks.mjs --uninstall       # 卸载
+npm ci
+npm run check
 ```
 
-钩子日志：`.cache/hook.log`。
+构建产物为 `main.js`。`npm run dev` 会监听源码并持续重建，`npm run check` 会依次完成类型检查、代码规范检查、测试和生产构建。
 
-> `.git/hooks/` 不受版本控制，换电脑或重新克隆后需要再装一次。
+发布新版本时使用 `npm version patch`（或 `minor`、`major`），该命令会同步 `package.json`、`manifest.json` 和 `versions.json`，并创建不带 `v` 前缀的 Git 标签。推送提交和标签后，GitHub Actions 会验证标签与清单版本一致并生成草稿 Release；确认后发布该草稿，BRAT 即可发现新版本。
 
-## 同步行为
+首次启用后，在“设置 → Tencent Docs Publisher”中粘贴腾讯文档 Token 并测试连接。Token 只保存在 Obsidian `SecretStorage`，不会写入 Vault、`data.json` 或日志。网络请求固定发送到 `https://docs.qq.com/openapi/mcp`。
 
-**整篇替换**：先把目标文档现有内容清空，再写入新内容。也就是说，直接在线改的图文会在下次同步时被覆盖。
-每次同步前会把原内容备份到 `.cache/backups/<fileId>-<时间>.mdx`。
+## 数据与安全
 
-支持的 Obsidian 语法：
+- 项目、Page ID 映射、缓存元数据和脱敏任务记录保存在插件 `data.json`；
+- Token、Authorization 请求头、正文、资源 base64 和上传 URL 不进入诊断日志；
+- 快速预览不发起远端请求，刷新后预览只读；
+- 移除项目只删除本地配置，不删除腾讯文档；
+- 当前清单标记为仅桌面端；完成设计要求的移动端真实 Vault 验收后，才会取消该限制。
 
-| Obsidian 写法 | 同步后 |
-| --- | --- |
-| `![[图片.png]]` | 上传为腾讯文档图片并嵌入正文 |
-| `![[图片.png\|说明]]` | 同上，并带上 alt 说明 |
-| `[[笔记]]` / `[[笔记\|别名]]` | 纯文本（别名优先） |
-| `[[规格书.pdf]]` | 自动导入为腾讯文档 PDF，正文里插入超链接 |
-| `**加粗**` `*斜体*` `~~删除~~` `==高亮==` | 转为 `<Mark>` 行内样式 |
-| `$行内公式$` | 保留为行内公式 |
-| `$$块级公式$$` | 转为 `<MathBlock>`，缩进保留（列表内的公式仍在列表里） |
-| Markdown 表格 | 转为 `<Table>` 组件 |
-| `- [ ]` / `- [x]` | 转为 `<Todo>` / `<Todo checked>` |
-| `` 代码块 `` / 行内代码 / 引用 / 分割线 | 原样保留 |
-| `%%注释%%` | 丢弃 |
+## 范围说明
 
-## 已知事项
-
-- **图片每次同步都会重新上传**，文档里拿到的是新的 CDN 地址；用 md5 在同一次运行内去重。
-- **PDF 会缓存**（`.cache/assets.json`），只要文件内容没变就复用已导入的文档，不会重复产生副本；改动后重新导入会生成一个新文档，旧的需要手动删。
-- 腾讯文档的读取接口不返回超链接的 href（显示成 `[文字]()`），这是它的序列化限制，文档里的链接本身是好的（导出 docx 可验证 `HYPERLINK` 字段）。
-- 智能文档导出 docx 时不带块级公式，属于导出限制，文档里正常显示。
-- 腾讯文档智能文档的根 `Page` 节点不能删，同步后会保留一个空的根页，不影响内容。
-
-### Word（`doc`）模式补充
-
-- 清空用的是「用空 HTML 整篇覆盖」；`insert_attachment` 要求插入点是**段落起始位置**，
-  所以每插一段都会重新取一次 `get_last_operable_pos`，调用次数比智能文档多一些。
-- Word 模式每次同步都会重新上传附件（`pre_insert_attachment` 的对象是一次性的），
-  不参与 `.cache/assets.json` 的缓存。
-- 行内公式 `$...$` 和块级公式 `$$...$$` 会被 `insert_markdown` 直接转成公式，不用特殊处理。
-- 智能文档模式里的 `<Mark>` / `<Table>` / `<MathBlock>` 是智能文档专有写法，Word 模式走的是
-  原生 Markdown，所以两种模式共用同一份源文件、各自转换（`lib/convert.mjs` 和 `lib/convert-doc.mjs`）。
-
-## 依赖
-
-- Node.js（已在 PATH 里）
-- 已授权的腾讯文档 MCP 配置：`%USERPROFILE%\.mcporter\mcporter.json`（由 tencent-docs skill 的 `setup.sh` 写入）
-
-## 维护提醒
-
-改动 `*.cmd` 启动器之后，跑一次 `node tools/fix-cmd.mjs`。
-cmd.exe 对无 BOM 的 UTF-8 和 LF 换行解析不稳定，这个脚本会把启动器统一成「纯 ASCII + CRLF」，
-所以中文提示一律由 Node 输出，批处理里不写中文。
+插件不提供双向同步、自动发布、Git 钩子、Word 模式或任意 MCP Endpoint 配置。完整产品行为、限制、验收标准和测试矩阵见 [DESIGN.md](DESIGN.md)。
