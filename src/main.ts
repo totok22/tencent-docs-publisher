@@ -16,8 +16,9 @@ import { obsidianMcpTransport } from "./tencent/obsidian-transport";
 import { PublishAssetResolver } from "./tencent/assets";
 import { uploadBinary } from "./tencent/binary-upload";
 import { PublisherError } from "./tencent/errors";
+import { findSmartcanvasDocuments, type RemoteDocumentChoice } from "./tencent/documents";
 import { BindingModal } from "./ui/binding-modal";
-import { ProjectSetupModal, type ProjectSetupValue, type RemoteDocumentChoice } from "./ui/project-setup-modal";
+import { ProjectSetupModal, type ProjectSetupValue } from "./ui/project-setup-modal";
 import { PreviewModal } from "./ui/preview-modal";
 import { ProgressModal } from "./ui/progress-modal";
 import { OverviewPickerModal } from "./ui/overview-picker-modal";
@@ -395,42 +396,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	private async findRemoteDocuments(query?: string): Promise<RemoteDocumentChoice[]> {
-		const client = this.createClient();
-		let rawItems: unknown[] = [];
-		if (query) {
-			const response = await client.callToolJson<Record<string, unknown>>(
-				"manage.search_file", { search_key: query }, "search-documents",
-			);
-			rawItems = Array.isArray(response.list) ? response.list : [];
-		} else {
-			const response = await client.callToolJson<Record<string, unknown>>(
-				"manage.recent_online_file", { num: 1, count: 20, order_by: 0 }, "recent-documents",
-			);
-			rawItems = Array.isArray(response.files)
-				? response.files
-				: Array.isArray(response.file) ? response.file : Array.isArray(response.list) ? response.list : [];
-		}
-		const choices: RemoteDocumentChoice[] = [];
-		for (const item of rawItems.slice(0, 20)) {
-			if (typeof item !== "object" || item === null) continue;
-			const record = item as Record<string, unknown>;
-			const fileId = stringField(record, ["file_id", "fileId"]);
-			if (!fileId) continue;
-			try {
-				const info = await client.callToolJson<Record<string, unknown>>(
-					"manage.query_file_info", { file_id: fileId }, "filter-smartcanvas",
-				);
-				if (info.type !== "smartcanvas") continue;
-				choices.push({
-					fileId,
-					title: stringField(info, ["title", "file_name"]) ?? stringField(record, ["title", "file_name"]) ?? fileId,
-					url: stringField(info, ["url", "file_url"]) ?? stringField(record, ["url", "file_url"]) ?? "",
-				});
-			} catch {
-				// Inaccessible and non-document search results are intentionally omitted.
-			}
-		}
-		return choices;
+		return findSmartcanvasDocuments(this.createClient(), query);
 	}
 
 	private async createRemoteRootDocument(title: string): Promise<RemoteDocumentChoice> {

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-11
+
+### Fixed
+
+- Paginate recent Tencent files and efficiently filter up to 20 SmartCanvas documents instead of stopping after the first mixed-type page.
+- Explain the actual and selected parent pages when a manual binding violates the remote hierarchy.
+
 ## [0.1.2] - 2026-09-11
 
 ### Fixed

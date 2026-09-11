@@ -1,16 +1,11 @@
 import { App, Modal, Notice, Setting, TFile, type TextComponent } from "obsidian";
+import type { RemoteDocumentChoice } from "../tencent/documents";
 
 export interface ProjectSetupValue {
 	sourceRootPath: string;
 	allowedRootPath: string;
 	remoteFileId: string;
 	publicRead: boolean;
-}
-
-export interface RemoteDocumentChoice {
-	fileId: string;
-	title: string;
-	url: string;
 }
 
 export class ProjectSetupModal extends Modal {

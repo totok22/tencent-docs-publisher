@@ -65,7 +65,7 @@ describe("page binding", () => {
 			{ "index.md": "root", "install.md": "nested-install" },
 			remote,
 			{},
-		)).toThrow("不在所选父页面下");
+		)).toThrow("远端父页面是“Other”，但本地父页面绑定到“Remote root”");
 	});
 });
 

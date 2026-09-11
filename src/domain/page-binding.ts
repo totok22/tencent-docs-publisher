@@ -112,7 +112,13 @@ export function bindingsFromSelections(
 		if (used.has(pageId)) throw new Error(`同一远端页面不能绑定多个本地页面：${remote.title}`);
 		used.add(pageId);
 		const parentId = proposal.parentLocalPath ? selections[proposal.parentLocalPath] : null;
-		if (remote.parentPageId !== parentId) throw new Error(`页面“${remote.title}”不在所选父页面下。`);
+		if (remote.parentPageId !== parentId) {
+			const actualParent = remote.parentPageId ? remoteNodes[remote.parentPageId]?.title ?? remote.parentPageId : "文档根级";
+			const selectedParent = parentId ? remoteNodes[parentId]?.title ?? parentId : "文档根级";
+			throw new Error(
+				`页面“${remote.title}”的远端父页面是“${actualParent}”，但本地父页面绑定到“${selectedParent}”。请先调整本地或腾讯文档的页面层级。`,
+			);
+		}
 		return {
 			...proposal,
 			status: "matched" as const,
