@@ -47,7 +47,7 @@ export function parseRemoteMdx(content: string, expectedPageId?: string): Parsed
 		directChildPages: directPages
 			.map((page) => ({
 				pageId: page.attributes.id ?? "",
-				title: page.attributes.title ?? page.attributes.name ?? extractPageTitle(page.raw),
+				title: page.attributes.title ?? page.attributes.name ?? extractPageTitle(page),
 				raw: page.raw,
 			}))
 			.filter((page) => page.pageId.length > 0),
@@ -176,9 +176,24 @@ function readAttribute(raw: string, name: string): string | null {
 	return parseAttributes(raw.slice(0, raw.indexOf(">") + 1))[name] ?? null;
 }
 
-function extractPageTitle(raw: string): string {
-	const heading = raw.match(/<Heading\b[^>]*>([\s\S]*?)<\/Heading>/i)?.[1];
-	return heading?.replace(/<[^>]+>/g, "").trim() ?? "未命名页面";
+function extractPageTitle(page: MdxElement): string {
+	const heading = page.raw.match(/<Heading\b[^>]*>([\s\S]*?)<\/Heading>/i)?.[1];
+	const headingText = heading?.replace(/<[^>]+>/g, "").trim();
+	if (headingText) return headingText;
+
+	const openingEnd = page.raw.indexOf(">") + 1;
+	const closingStart = page.raw.lastIndexOf("</Page");
+	if (openingEnd <= 0 || closingStart < openingEnd) return "未命名页面";
+	let cursor = openingEnd;
+	let directText = "";
+	for (const child of page.children) {
+		const childStart = child.start - page.start;
+		const childEnd = child.end - page.start;
+		if (childStart >= cursor) directText += page.raw.slice(cursor, childStart);
+		cursor = Math.max(cursor, childEnd);
+	}
+	directText += page.raw.slice(cursor, closingStart);
+	return directText.replace(/\s+/g, " ").trim() || "未命名页面";
 }
 
 function escapeAttribute(value: string): string {

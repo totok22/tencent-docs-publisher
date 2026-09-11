@@ -56,11 +56,11 @@ npm run check
 
 构建产物为 `main.js`。`npm run dev` 会监听源码并持续重建，`npm run check` 会依次完成类型检查、代码规范检查、测试和生产构建。
 
-自动化测试包括 7 个测试文件、47 个测试用例，并覆盖两层页面树、超过 20 个 Block、远端冲突、恢复路径、JSON/SSE MCP 响应、图片和 PDF。发布前仍需在真实 Obsidian Vault 与腾讯测试文档中执行人工验收。
+自动化测试包括 7 个测试文件、49 个测试用例，并覆盖两层页面树、超过 20 个 Block、远端冲突、恢复路径、JSON/SSE MCP 响应、图片和 PDF。发布前仍需在真实 Obsidian Vault 与腾讯测试文档中执行人工验收。
 
 ## 发布
 
-`0.1.0` 已作为 [GitHub 预发布版](https://github.com/totok22/tencent-docs-publisher/releases/tag/0.1.0)发布，可用于 BRAT 安装测试。
+最新测试版为 [`0.1.2`](https://github.com/totok22/tencent-docs-publisher/releases/tag/0.1.2)，可通过 BRAT 安装或更新。
 
 后续版本使用 `npm version patch`（或 `minor`、`major`），该命令会同步 `package.json`、`manifest.json` 和 `versions.json`，并创建不带 `v` 前缀的 Git 标签。随后执行：
 

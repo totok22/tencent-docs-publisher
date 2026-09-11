@@ -165,7 +165,7 @@ get_top_level_pages(file_id)
 
 `smartcanvas.read` 是分页接口，`size` 最大为 20。每次读取一个 Page 时必须持续传入返回的 `next_token`，直到游标为空，再拼接该 Page 的完整内容。任何树发现、冲突检查、备份或发布后验证都不得只读取第一页。
 
-腾讯当前部署接口返回 `top_level_pages[].id`，页面标题可能编码在 `element` JSON 字符串中；适配层同时兼容 `pages[].page_id`、顶层 `root_page_id` 和 camelCase 字段。`children` 可能同时包含普通 Block ID 与 Page ID，不能直接把该数组当作子页面列表。页面层级以完整回读内容中的 `<Page>` 嵌套关系为准。
+腾讯当前部署接口返回 `top_level_pages[].id`，根页面标题可能编码在 `page:{title:"..."}` 形式的 `element` 字符串中；父页面回读中的子页面标题则可能是 `<Page id="...">标题</Page>` 的直接文本。适配层同时兼容 `pages[].page_id`、顶层 `root_page_id` 和 camelCase 字段。`children` 可能同时包含普通 Block ID 与 Page ID，不能直接把该数组当作子页面列表。页面层级以完整回读内容中的 `<Page>` 嵌套关系为准。
 
 远端树节点至少保存：
 
@@ -728,11 +728,13 @@ src/
 - [x] 配置公开 GitHub 仓库 `totok22/tencent-docs-publisher`；
 - [x] 增加 BRAT 兼容的 GitHub Release 工作流，发布 `main.js`、`manifest.json` 和 `styles.css`；
 - [x] 创建并发布首个 `0.1.0` 预发布版，三个 BRAT 安装资产已通过下载、摘要和语法验证；
-- [ ] 在真实 Obsidian Vault 中通过 BRAT 完成安装、启用和基本操作验证。
+- [x] 在真实 Obsidian Vault 中通过 BRAT 完成安装、启用、连接测试和远端文档列表读取；
+- [x] 更新到 `0.1.1` 后完成项目创建和远端页面树读取，并据真实响应修复子页面标题解析；
+- [ ] 更新到 `0.1.2` 后确认子页面标题、完成页面绑定，并执行一次测试文档发布验证。
 
 ## 18. 测试策略
 
-当前自动化测试为 7 个测试文件、47 个测试用例，覆盖：
+当前自动化测试为 7 个测试文件、49 个测试用例，覆盖：
 
 - 本地 wikilink、Markdown link、嵌入、循环、多父引用、同名文件和跨范围链接的树解析；
 - 远端 MDX 的直接/嵌套 Page 提取、分页拼接、readonly/Unsupported 保留和内容指纹稳定性；

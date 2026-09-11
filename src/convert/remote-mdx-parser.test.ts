@@ -23,6 +23,26 @@ describe("remote MDX parser", () => {
 		]);
 	});
 
+	it("uses direct Page text as the title in deployed Tencent responses", () => {
+		const parsed = parseRemoteMdx(`<Page id="root">
+<Page id="child-1">
+  测试1
+</Page>
+<Page id="child-2">测试2</Page>
+</Page>`, "root");
+		expect(parsed.directChildPages.map(({ pageId, title }) => ({ pageId, title }))).toEqual([
+			{ pageId: "child-1", title: "测试1" },
+			{ pageId: "child-2", title: "测试2" },
+		]);
+	});
+
+	it("does not mistake nested block content for a Page title", () => {
+		const parsed = parseRemoteMdx(`<Page id="root">
+<Page id="child"><Paragraph id="p">正文，不是标题</Paragraph></Page>
+</Page>`, "root");
+		expect(parsed.directChildPages[0]?.title).toBe("未命名页面");
+	});
+
 	it("marks Page, readonly and unsupported blocks for preservation", () => {
 		const parsed = parseRemoteMdx(CONTENT, "root");
 		expect(parsed.blocks.map((block) => [block.id, block.reason])).toEqual([

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-11
+
+### Fixed
+
+- Read child-page titles from direct text inside deployed `<Page>` responses.
+- Parse root-page titles from Tencent's deployed `page:{title:"..."}` element representation.
+
 ## [0.1.1] - 2026-09-11
 
 ### Fixed

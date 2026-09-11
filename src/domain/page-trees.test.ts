@@ -122,7 +122,7 @@ describe("remote page tree", () => {
 						top_level_pages: [{
 							id: "deployed-root",
 							type: "Page",
-							element: JSON.stringify({ title: "根页面标题" }),
+							element: 'page:{title:"根页面标题"}',
 							children: ["ordinary-block"],
 						}],
 					}

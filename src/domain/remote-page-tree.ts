@@ -113,7 +113,8 @@ function pageTitle(page: Record<string, unknown> | null): string | undefined {
 		try {
 			element = asRecord(JSON.parse(page.element) as unknown);
 		} catch {
-			return undefined;
+			const deployedTitle = page.element.match(/(?:^|[,{])\s*title\s*:\s*(?:"([^"]*)"|'([^']*)')/)?.slice(1).find(Boolean);
+			if (deployedTitle) return deployedTitle;
 		}
 	}
 	return stringField(element ?? {}, ["title", "name"]);
