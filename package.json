@@ -1,6 +1,6 @@
 {
   "name": "tencent-docs-publisher",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Obsidian plugin to publish notes and document trees to Tencent Docs",
   "main": "main.js",
   "type": "module",
