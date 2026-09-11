@@ -34,9 +34,6 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 
 	text = replaceTables(text);
 	text = replaceCallouts(text);
-	text = text.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_whole, formula: string) =>
-		`<MathBlock>${escapeText(formula.trim())}</MathBlock>`,
-	);
 	text = text.replace(/^\s*-\s+\[([ xX])\]\s+(.+)$/gm, (_whole, checked: string, body: string) =>
 		`<Todo${checked.toLowerCase() === "x" ? " checked" : ""}>${body}</Todo>`,
 	);
@@ -83,6 +80,9 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 	for (const [index, tag] of generated.entries()) {
 		text = text.split(`\u0000TD_COMPONENT_${index}\u0000`).join(tag);
 	}
+	text = transformOutsideMarkdownLiterals(text, (plainText) =>
+		plainText.replace(/\{/g, "&#123;").replace(/\}/g, "&#125;"),
+	);
 
 	return { mdx: text.trim(), assets, warnings };
 }
@@ -104,12 +104,12 @@ export function applyResolvedAssets(
 
 export function validateGeneratedMdx(mdx: string): string[] {
 	const errors: string[] = [];
-	const withoutFences = mdx.replace(/```[\s\S]*?```/g, "");
-	if (/\{[\s\S]*?\}/.test(withoutFences)) errors.push("禁止 MDX 表达式。");
+	const withoutLiterals = transformOutsideMarkdownLiterals(mdx, (plainText) => plainText, "");
+	if (/\{[\s\S]*?\}/.test(withoutLiterals)) errors.push("禁止 MDX 表达式。");
 	const allowed = new Set(["Table", "TableRow", "TableCell", "Callout", "MathBlock", "Todo", "Mark", "Image"]);
 	const tagPattern = /<\/?([A-Za-z][\w.-]*)([^>]*)>/g;
 	let match: RegExpExecArray | null;
-	while ((match = tagPattern.exec(withoutFences)) !== null) {
+	while ((match = tagPattern.exec(withoutLiterals)) !== null) {
 		const name = match[1];
 		if (!name || !allowed.has(name)) errors.push(`未知 MDX 组件：${name ?? "?"}`);
 		const attributes = match[2] ?? "";
@@ -119,6 +119,23 @@ export function validateGeneratedMdx(mdx: string): string[] {
 		}
 	}
 	return [...new Set(errors)];
+}
+
+function transformOutsideMarkdownLiterals(
+	text: string,
+	transform: (plainText: string) => string,
+	literalReplacement?: string,
+): string {
+	const literalPattern = /```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]*?\$\$|(?<!\\)\$(?!\$)(?:\\.|[^$\n\\])+(?<!\\)\$/g;
+	let output = "";
+	let cursor = 0;
+	let match: RegExpExecArray | null;
+	while ((match = literalPattern.exec(text)) !== null) {
+		output += transform(text.slice(cursor, match.index));
+		output += literalReplacement ?? match[0];
+		cursor = literalPattern.lastIndex;
+	}
+	return output + transform(text.slice(cursor));
 }
 
 function stripFrontmatter(markdown: string): string {
@@ -180,10 +197,6 @@ function isPdf(target: string): boolean {
 
 function fileLabel(target: string): string {
 	return (target.split("/").pop() ?? target).replace(/\.md$/i, "");
-}
-
-function escapeText(value: string): string {
-	return value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function escapeAttribute(value: string): string {

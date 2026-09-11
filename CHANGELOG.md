@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-11
+
+### Fixed
+
+- Preserve Markdown math and allow LaTeX grouping braces instead of rejecting valid formulas as MDX expressions.
+- Escape literal prose braces while retaining the MDX expression safety check outside Markdown math and code.
+
 ## [0.1.4] - 2026-09-11
 
 ### Fixed

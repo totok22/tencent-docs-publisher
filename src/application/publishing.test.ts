@@ -7,11 +7,11 @@ import { publishPreparedPage } from "./publish-page";
 
 describe("Markdown conversion", () => {
 	it("converts tables, formulas, callouts, highlights, images and PDFs", () => {
-		const markdown = `---\ntitle: Hidden\n---\n> [!NOTE] Tip\n> body\n\n| A | B |\n| -- | -- |\n| 1 | 2 |\n\n$$x^2$$\n==mark==\n![[img.png|diagram]]\n[spec](doc.pdf)\n%%hidden%%`;
+		const markdown = `---\ntitle: Hidden\n---\n> [!NOTE] Tip\n> body\n\n| A | B |\n| -- | -- |\n| 1 | 2 |\n\n$$R_{\\text{test}} = \\text{max}$$\n==mark==\n![[img.png|diagram]]\n[spec](doc.pdf)\n%%hidden%%`;
 		const conversion = convertMarkdownToMdx(markdown, { resolvePath: (target) => `assets/${target}` });
 		expect(conversion.mdx).toContain('<Callout type="note" title="Tip">body</Callout>');
 		expect(conversion.mdx).toContain("<Table>");
-		expect(conversion.mdx).toContain("<MathBlock>x^2</MathBlock>");
+		expect(conversion.mdx).toContain("$$R_{\\text{test}} = \\text{max}$$");
 		expect(conversion.mdx).toContain('<Mark backgroundColor="yellow">mark</Mark>');
 		expect(conversion.mdx).not.toContain("title: Hidden");
 		expect(conversion.mdx).not.toContain("hidden");
@@ -23,6 +23,16 @@ describe("Markdown conversion", () => {
 		expect(resolved).toContain('<Image src="https://img" alt="diagram" />');
 		expect(resolved).toContain("[spec](https://pdf)");
 		expect(validateGeneratedMdx(resolved)).toEqual([]);
+	});
+
+	it("escapes prose braces while allowing braces in Markdown math and code", () => {
+		const conversion = convertMarkdownToMdx("字面量 {value}\n\n行内 $R_{test}$\n\n`const x = {a: 1}`", {
+			resolvePath: () => null,
+		});
+		expect(conversion.mdx).toContain("字面量 &#123;value&#125;");
+		expect(conversion.mdx).toContain("$R_{test}$");
+		expect(conversion.mdx).toContain("`const x = {a: 1}`");
+		expect(validateGeneratedMdx(conversion.mdx)).toEqual([]);
 	});
 
 	it("escapes raw HTML and rejects expressions/unknown components", () => {
