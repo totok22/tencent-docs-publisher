@@ -1,7 +1,8 @@
 # Obsidian 腾讯文档发布插件设计
 
-状态：实现基线 0.4
+状态：实现基线 0.4；首版代码与自动化测试已完成，待真实 Vault 和腾讯测试文档验收
 暂定名称：Tencent Docs Publisher / 腾讯文档发布器
+仓库：https://github.com/totok22/tencent-docs-publisher
 
 ## 1. 产品定位
 
@@ -593,8 +594,9 @@ Authorization 请求头和完整 Token 永不进入诊断信息。
 ```text
 src/
 ├─ main.ts
-├─ commands.ts
+├─ types.ts
 ├─ domain/
+│  ├─ hash.ts
 │  ├─ local-page-tree.ts
 │  ├─ remote-page-tree.ts
 │  ├─ page-binding.ts
@@ -604,27 +606,34 @@ src/
 │  ├─ vault-reader.ts
 │  └─ secret-store.ts
 ├─ tencent/
+│  ├─ errors.ts
 │  ├─ mcp-client.ts
+│  ├─ mcp-protocol.ts
+│  ├─ obsidian-transport.ts
 │  ├─ smartcanvas.ts
 │  ├─ assets.ts
+│  ├─ binary-upload.ts
 │  └─ permissions.ts
 ├─ convert/
 │  ├─ markdown-to-mdx.ts
-│  ├─ embeds.ts
 │  └─ remote-mdx-parser.ts
 ├─ application/
-│  ├─ discover-project.ts
 │  ├─ refresh-bindings.ts
 │  ├─ preflight.ts
 │  ├─ publish-page.ts
 │  └─ publish-project.ts
+├─ settings/
+│  └─ settings-tab.ts
 └─ ui/
    ├─ binding-modal.ts
+   ├─ overview-picker-modal.ts
    ├─ preview-modal.ts
    ├─ progress-modal.ts
-   ├─ project-view.ts
-   └─ settings-tab.ts
+   ├─ project-setup-modal.ts
+   └─ project-view.ts
 ```
+
+测试文件与对应模块放在同一目录，以 `*.test.ts` 命名。仓库根目录保留 Obsidian 必需清单、样式、构建配置、版本脚本和 GitHub Release 工作流；生成的 `main.js` 不提交到 Git，而是作为 Release 资产发布。
 
 技术要求：
 
@@ -638,6 +647,9 @@ src/
 - MCP 客户端固定走 HTTPS，完成 `initialize` 与 `notifications/initialized`，保存 `mcp-session-id`，并兼容 JSON 与 `text/event-stream` 响应；
 - 日志只记录工具名、阶段、耗时、脱敏错误和 trace id，不记录请求头、Token、上传 URL、正文或资源 base64；
 - 使用 `SecretStorage` 要求最低 Obsidian 版本为 1.11.4，`manifest.json` 与 `versions.json` 必须一致；
+- `obsidian` 类型依赖固定为已经验证的 1.13.1，TypeScript 开启完整 `strict` 检查；
+- `manifest.json` 保持 `isDesktopOnly: true`，真实移动端验收完成前不承诺移动端支持；
+- GitHub Release 标签、名称、`package.json` 与发布资产中的 `manifest.json` 版本必须一致；
 - 页面解析必须保留 Page、readonly 和 Unsupported 块；
 - 所有命令、右键和面板共用同一发布服务。
 
@@ -688,35 +700,37 @@ src/
 
 ## 16. 实施顺序
 
-1. 整理插件骨架和清单版本，建立 SecretStorage、数据迁移、设置页和稳定 command id。
-2. 实现直连腾讯 HTTPS MCP 的客户端、脱敏错误模型和只读连接测试。
-3. 实现指定 Page 的完整分页读取、远端 MDX 安全解析与内容指纹。
-4. 实现本地链接树与远端 Page 树递归解析。
-5. 实现树形绑定界面、远端缓存和“刷新远端页面树”。
-6. 实现单页快速预览、刷新后预检与发布，并保证保留子 Page 块。
-7. 加入非事务失败恢复、冲突确认和发布后分页回读验证。
-8. 实现整棵树增量发布、图片、PDF、请求预算和公开权限请求。
-9. 接入 Ctrl+P、文件树右键、编辑器右键和发布管理面板。
-10. 使用至少两层子页面、超过 20 个 Block、远端人工修改和中途失败场景完成端到端验证。
+以下顺序已经用于首版实现；完成标记指代码与自动化测试完成，不替代真实服务验收：
 
-## 17. 开始实现前的仓库整理
+1. [x] 整理插件骨架和清单版本，建立 SecretStorage、数据迁移、设置页和稳定 command id。
+2. [x] 实现直连腾讯 HTTPS MCP 的客户端、脱敏错误模型和只读连接测试。
+3. [x] 实现指定 Page 的完整分页读取、远端 MDX 安全解析与内容指纹。
+4. [x] 实现本地链接树与远端 Page 树递归解析。
+5. [x] 实现树形绑定界面、远端缓存和“刷新远端页面树”。
+6. [x] 实现单页快速预览、刷新后预检与发布，并保证保留子 Page 块。
+7. [x] 加入非事务失败恢复、冲突确认和发布后分页回读验证。
+8. [x] 实现整棵树增量发布、图片、PDF、请求预算和公开权限请求。
+9. [x] 接入 Ctrl+P、文件树右键、编辑器右键和发布管理面板。
+10. [ ] 在真实 Obsidian Vault 和腾讯测试文档中完成至少两层子页面、超过 20 个 Block、远端人工修改和中途失败场景验收；对应模拟端到端测试已完成。
 
-当前仓库骨架与本设计仍有若干不一致，实现任务应先处理：
+## 17. 仓库整理与发布结构
 
-- `manifest.json` 的描述仍写有双向同步，应改为单向发布；
-- `manifest.json` 与 `versions.json` 的最低 Obsidian 版本应统一到 1.11.4；
-- 当前设置模型中的自定义 MCP Endpoint、默认空间和自动保存同步不属于第一版，应移除；
-- 默认 Endpoint 不能是本机 `localhost`，插件应直接访问固定腾讯 HTTPS MCP 地址；
-- `README.md` 仍主要描述旧命令行同步器，应重写为插件说明；
-- `legacy-sync/` 只可作为迁移参考，不参与插件构建；公开仓库发布前应移出或彻底通用化其中的配置和示例；
-- `manifest.json`、设置页、命令名称、类型定义和 README 必须与本设计的“发布”术语一致，避免混用“自动同步”和“双向同步”。
-- `obsidian` 类型依赖应固定到经过验证的版本，不使用浮动的 `latest`；TypeScript 开启完整 `strict` 检查。
+开始网络和发布逻辑前完成的整理如下：
 
-完成以上整理后再实现网络与发布逻辑，避免以旧脚手架的数据模型继续扩展。
+- [x] `manifest.json` 改为单向发布描述，并与 `versions.json` 统一最低 Obsidian 版本 1.11.4；
+- [x] 移除自定义 MCP Endpoint、默认空间、自动保存同步和本机 `localhost` 默认值；
+- [x] 网络请求固定到腾讯 HTTPS MCP 地址；
+- [x] `README.md` 重写为 Obsidian 插件说明，并统一使用“发布”术语；
+- [x] 删除 `legacy-sync/` 和旧同步器缓存，不再发布或参与构建；
+- [x] 固定 `obsidian` 类型依赖到 1.13.1，并启用完整 TypeScript `strict` 检查；
+- [x] 增加 ESLint、EditorConfig、版本同步脚本、许可证和变更日志；
+- [x] 配置公开 GitHub 仓库 `totok22/tencent-docs-publisher`；
+- [x] 增加 BRAT 兼容的 GitHub Release 工作流，发布 `main.js`、`manifest.json` 和 `styles.css`；
+- [ ] 创建并人工发布首个 `0.1.0` Release，随后通过 BRAT 执行安装验证。
 
 ## 18. 测试策略
 
-自动化测试至少覆盖：
+当前自动化测试为 7 个测试文件、46 个测试用例，覆盖：
 
 - 本地 wikilink、Markdown link、嵌入、循环、多父引用、同名文件和跨范围链接的树解析；
 - 远端 MDX 的直接/嵌套 Page 提取、分页拼接、readonly/Unsupported 保留和内容指纹稳定性；
@@ -724,7 +738,7 @@ src/
 - JSON/SSE 两种 MCP 响应、会话 ID、超时、限流、额度不足、响应丢失和重复请求保护；
 - 数据版本迁移、Token 更换账号、缓存过期和项目移除不影响远端内容。
 
-端到端测试使用专门的通用测试文档，不使用真实项目资料，至少包含：
+模拟端到端测试已经覆盖两层页面树、超过 20 个 Block、额外未绑定远端页面和发布写入。真实端到端验收必须使用专门的通用测试文档，不使用真实项目资料，并至少包含：
 
 1. 根页面、两层子页面和同名不同父级页面；
 2. 单页超过 20 个 Block，以验证分页；
