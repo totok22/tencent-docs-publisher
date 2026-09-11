@@ -726,7 +726,8 @@ src/
 - [x] 增加 ESLint、EditorConfig、版本同步脚本、许可证和变更日志；
 - [x] 配置公开 GitHub 仓库 `totok22/tencent-docs-publisher`；
 - [x] 增加 BRAT 兼容的 GitHub Release 工作流，发布 `main.js`、`manifest.json` 和 `styles.css`；
-- [ ] 创建并人工发布首个 `0.1.0` Release，随后通过 BRAT 执行安装验证。
+- [x] 创建并发布首个 `0.1.0` 预发布版，三个 BRAT 安装资产已通过下载、摘要和语法验证；
+- [ ] 在真实 Obsidian Vault 中通过 BRAT 完成安装、启用和基本操作验证。
 
 ## 18. 测试策略
 

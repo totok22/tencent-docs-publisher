@@ -60,12 +60,7 @@ npm run check
 
 ## 发布
 
-首次发布当前 `0.1.0` 时，在提交通过检查后创建同名标签并推送：
-
-```bash
-git tag 0.1.0
-git push origin main --follow-tags
-```
+`0.1.0` 已作为 [GitHub 预发布版](https://github.com/totok22/tencent-docs-publisher/releases/tag/0.1.0)发布，可用于 BRAT 安装测试。
 
 后续版本使用 `npm version patch`（或 `minor`、`major`），该命令会同步 `package.json`、`manifest.json` 和 `versions.json`，并创建不带 `v` 前缀的 Git 标签。随后执行：
 
