@@ -113,6 +113,26 @@ describe("remote page tree", () => {
 			pageId: "page-array-root", title: "Page title", remoteUrl: "https://docs.qq.com/doc",
 		});
 	});
+
+	it("supports the deployed top_level_pages[].id response and parses its element title", async () => {
+		const client = {
+			async callToolJson<T>(name: string): Promise<T> {
+				return (name === "smartcanvas.get_top_level_pages"
+					? {
+						top_level_pages: [{
+							id: "deployed-root",
+							type: "Page",
+							element: JSON.stringify({ title: "根页面标题" }),
+							children: ["ordinary-block"],
+						}],
+					}
+					: { data: { type: "smartcanvas", url: "https://docs.qq.com/aio/example" } }) as T;
+			},
+		};
+		expect(await resolveRemoteDocumentRoot(client, "file")).toEqual({
+			pageId: "deployed-root", title: "根页面标题", remoteUrl: "https://docs.qq.com/aio/example",
+		});
+	});
 });
 
 function fixtureRepository(pages: Record<string, LocalPageMetadata>): LocalPageRepository {

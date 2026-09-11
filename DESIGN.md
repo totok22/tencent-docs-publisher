@@ -149,7 +149,7 @@
 
 ```text
 get_top_level_pages(file_id)
-└─ root_page_id
+└─ top_level_pages[0].id（同时兼容 pages[].page_id 等响应变体）
    └─ read(file_id, root_page_id)
       ├─ 普通内容块
       ├─ Page child_A
@@ -165,7 +165,7 @@ get_top_level_pages(file_id)
 
 `smartcanvas.read` 是分页接口，`size` 最大为 20。每次读取一个 Page 时必须持续传入返回的 `next_token`，直到游标为空，再拼接该 Page 的完整内容。任何树发现、冲突检查、备份或发布后验证都不得只读取第一页。
 
-`smartcanvas.get_top_level_pages` 返回的 `children` 可能同时包含普通 Block ID 与 Page ID，不能直接把该数组当作子页面列表。页面层级以完整回读内容中的 `<Page>` 嵌套关系为准。
+腾讯当前部署接口返回 `top_level_pages[].id`，页面标题可能编码在 `element` JSON 字符串中；适配层同时兼容 `pages[].page_id`、顶层 `root_page_id` 和 camelCase 字段。`children` 可能同时包含普通 Block ID 与 Page ID，不能直接把该数组当作子页面列表。页面层级以完整回读内容中的 `<Page>` 嵌套关系为准。
 
 远端树节点至少保存：
 
@@ -731,7 +731,7 @@ src/
 
 ## 18. 测试策略
 
-当前自动化测试为 7 个测试文件、46 个测试用例，覆盖：
+当前自动化测试为 7 个测试文件、47 个测试用例，覆盖：
 
 - 本地 wikilink、Markdown link、嵌入、循环、多父引用、同名文件和跨范围链接的树解析；
 - 远端 MDX 的直接/嵌套 Page 提取、分页拼接、readonly/Unsupported 保留和内容指纹稳定性；

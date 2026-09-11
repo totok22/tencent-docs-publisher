@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting, TFile } from "obsidian";
+import { App, Modal, Notice, Setting, TFile, type TextComponent } from "obsidian";
 
 export interface ProjectSetupValue {
 	sourceRootPath: string;
@@ -39,20 +39,24 @@ export class ProjectSetupModal extends Modal {
 			.setName("允许跟随的根文件夹")
 			.setDesc("链接到该范围外的 Markdown 只保留为普通引用。")
 			.addText((text) => text.setValue(value.allowedRootPath).onChange((input) => { value.allowedRootPath = input.trim(); }));
+		let fileIdInput: TextComponent | null = null;
 		const fileIdSetting = new Setting(this.contentEl)
 			.setName("腾讯智能文档 file_id")
 			.setDesc("必须是内部 file_id，不是从网页 URL 猜出的标识。")
-			.addText((text) => text.setPlaceholder("输入已知 file_id").onChange((input) => { value.remoteFileId = input.trim(); }));
+			.addText((text) => {
+				fileIdInput = text;
+				text.setPlaceholder("输入已知 file_id").onChange((input) => { value.remoteFileId = input.trim(); });
+			});
 		const resultsEl = this.contentEl.createDiv("tencent-docs-publisher-document-results");
 		let query = "";
 		new Setting(this.contentEl)
 			.setName("选择已有智能文档")
 			.setDesc("可加载最近文档或按标题搜索；选择结果会填入上方 file_id。")
 			.addText((text) => text.setPlaceholder("文档标题").onChange((input) => { query = input.trim(); }))
-			.addButton((button) => button.setButtonText("最近").onClick(() => void this.renderChoices(resultsEl, awaitable(() => this.findDocuments()), value, fileIdSetting)))
+			.addButton((button) => button.setButtonText("最近").onClick(() => void this.renderChoices(resultsEl, awaitable(() => this.findDocuments()), value, fileIdSetting, fileIdInput)))
 			.addButton((button) => button.setButtonText("搜索").onClick(() => {
 				if (!query) { new Notice("请输入搜索关键词。"); return; }
-				void this.renderChoices(resultsEl, awaitable(() => this.findDocuments(query)), value, fileIdSetting);
+				void this.renderChoices(resultsEl, awaitable(() => this.findDocuments(query)), value, fileIdSetting, fileIdInput);
 			}));
 		let newTitle = this.sourceFile.basename;
 		new Setting(this.contentEl)
@@ -64,6 +68,7 @@ export class ProjectSetupModal extends Modal {
 				try {
 					const created = await this.createRootDocument(newTitle);
 					value.remoteFileId = created.fileId;
+					fileIdInput?.setValue(created.fileId);
 					fileIdSetting.descEl.setText(`已选择新文档：${created.title} (${created.fileId})`);
 				} catch (error) {
 					new Notice(error instanceof Error ? error.message : "新建文档失败。");
@@ -79,11 +84,14 @@ export class ProjectSetupModal extends Modal {
 					new Notice("请输入腾讯智能文档内部 file_id。");
 					return;
 				}
+				button.setDisabled(true);
 				try {
 					await this.onCreate(value);
 					this.close();
 				} catch (error) {
 					new Notice(error instanceof Error ? error.message : "创建发布项目失败。");
+				} finally {
+					button.setDisabled(false);
 				}
 			}),
 		);
@@ -98,6 +106,7 @@ export class ProjectSetupModal extends Modal {
 		choicesPromise: Promise<RemoteDocumentChoice[]>,
 		value: ProjectSetupValue,
 		fileIdSetting: Setting,
+		fileIdInput: TextComponent | null,
 	): Promise<void> {
 		container.empty();
 		container.createEl("p", { text: "正在读取…" });
@@ -109,6 +118,7 @@ export class ProjectSetupModal extends Modal {
 				new Setting(container).setName(choice.title).setDesc(choice.fileId).addButton((button) =>
 					button.setButtonText("选择").onClick(() => {
 						value.remoteFileId = choice.fileId;
+						fileIdInput?.setValue(choice.fileId);
 						fileIdSetting.descEl.setText(`已选择：${choice.title} (${choice.fileId})`);
 					}),
 				);

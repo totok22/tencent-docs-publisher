@@ -56,7 +56,7 @@ npm run check
 
 构建产物为 `main.js`。`npm run dev` 会监听源码并持续重建，`npm run check` 会依次完成类型检查、代码规范检查、测试和生产构建。
 
-自动化测试包括 7 个测试文件、46 个测试用例，并覆盖两层页面树、超过 20 个 Block、远端冲突、恢复路径、JSON/SSE MCP 响应、图片和 PDF。发布前仍需在真实 Obsidian Vault 与腾讯测试文档中执行人工验收。
+自动化测试包括 7 个测试文件、47 个测试用例，并覆盖两层页面树、超过 20 个 Block、远端冲突、恢复路径、JSON/SSE MCP 响应、图片和 PDF。发布前仍需在真实 Obsidian Vault 与腾讯测试文档中执行人工验收。
 
 ## 发布
 
