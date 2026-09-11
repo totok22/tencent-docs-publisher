@@ -65,7 +65,7 @@ npm run check
 
 ## 发布
 
-最新测试版为 [`0.1.6`](https://github.com/totok22/tencent-docs-publisher/releases/tag/0.1.6)，可通过 BRAT 安装或更新。
+最新测试版为 [`0.1.7`](https://github.com/totok22/tencent-docs-publisher/releases/tag/0.1.7)，可通过 BRAT 安装或更新。
 
 后续版本使用 `npm version patch`（或 `minor`、`major`），该命令会同步 `package.json`、`manifest.json` 和 `versions.json`，并创建不带 `v` 前缀的 Git 标签。随后执行：
 

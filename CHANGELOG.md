@@ -6,10 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-09-11
+
 ### Fixed
 
 - Write into a sub page by anchoring on an ordinary block that belongs to it; an empty sub page is now skipped with an actionable message instead of silently appending its content to the document root page.
-- Convert block math into a MathBlock component so formulas keep their backslash text and backslash Omega escapes and no longer collect a random id suffix.
+- Convert block math into a MathBlock component, outside code fences, so formulas keep their backslash text and backslash Omega escapes and no longer collect a random id suffix.
+- Warn about unpaired $$ delimiters instead of writing them silently.
 - Drop empty Markdown headings, which Tencent rendered as a stray placeholder heading block.
 
 ## [0.1.6] - 2026-09-11
