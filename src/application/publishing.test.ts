@@ -118,6 +118,29 @@ describe("read-only preflight", () => {
 });
 
 describe("single page publishing", () => {
+	it.each([
+		["a page containing only a child Page", '<Page id="child">Child</Page>', ["child"]],
+		["a completely empty page", "---\ntitle: Empty\n---\n", []],
+	])("appends without a Page anchor for %s", async (_case, initialRemote, expectedChildren) => {
+		const project = fixtureProject();
+		let remote = initialRemote;
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				if (args?.action === "INSERT_AFTER" && args.id === undefined) {
+					remote += '<Paragraph id="new">new</Paragraph>';
+				}
+				return {} as T;
+			},
+		};
+		const preflight = await preflightPage(fixtureReader("new"), project, "index.md", "refreshed", client);
+		await publishPreparedPage(client, project, preflight, "new");
+		expect(operations).toEqual([{ file_id: "file", action: "INSERT_AFTER", content: "new" }]);
+		expect(parseRemoteMdx(remote, "root").directChildPages.map((page) => page.pageId)).toEqual(expectedChildren);
+	});
+
 	it("deletes only ordinary blocks and verifies that child Page order is retained", async () => {
 		const project = fixtureProject();
 		let remote = '<Page id="root"><Paragraph id="old">old</Paragraph><Page id="child" title="Child" /><Readonly id="locked" readonly="true">keep</Readonly><Custom id="unknown">keep</Custom></Page>';

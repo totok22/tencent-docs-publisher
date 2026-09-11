@@ -5,7 +5,7 @@ import { isWithinRoot } from "../domain/local-page-tree";
 import { readCompletePage, type ToolJsonCaller } from "../tencent/smartcanvas";
 import type { PublishProject, RemotePageBinding, RemoteTreeCache } from "../types";
 
-export const CONVERTER_VERSION = "0.4.0";
+export const CONVERTER_VERSION = "0.4.1";
 
 export interface PreflightVaultReader {
 	readMarkdown(path: string): Promise<string>;

@@ -32,15 +32,21 @@ export async function publishPreparedPage(
 	const before = preflight.parsedRemote;
 	const writable = before.blocks.filter((block) => !block.preserve);
 	if (writable.some((block) => !block.id)) throw new Error("远端普通内容块缺少 Block ID，无法安全替换。");
-	const anchor = writable.find((block) => block.id)?.id ?? before.blocks.find((block) => block.reason === "page" && block.id)?.id ?? null;
-	if (!anchor) throw new Error("页面完全空白，请先在腾讯文档页面中输入任意占位文字后刷新。");
+	const anchor = writable.find((block) => block.id)?.id ?? null;
 	const expectedChildIds = before.directChildPages.map((page) => page.pageId);
 	let mutated = false;
 	let remoteHash: string;
 	try {
 		if (generatedMdx.trim()) {
 			try {
-				await edit(client, project.remoteFileId, "INSERT_BEFORE", anchor, generatedMdx, "insert-page-content");
+				await edit(
+					client,
+					project.remoteFileId,
+					anchor ? "INSERT_BEFORE" : "INSERT_AFTER",
+					anchor ?? undefined,
+					generatedMdx,
+					"insert-page-content",
+				);
 				mutated = true;
 			} catch (error) {
 				const probe = await readCompletePage(client, project.remoteFileId, binding.pageId);
@@ -106,9 +112,15 @@ async function restoreSnapshot(
 		const snapshot = parseRemoteMdx(snapshotContent, pageId);
 		const oldOrdinaryContent = snapshot.blocks.filter((block) => !block.preserve).map((block) => block.raw).join("\n");
 		if (oldOrdinaryContent) {
-			const anchor = current.blocks.find((block) => block.id)?.id;
-			if (!anchor) return false;
-			await edit(client, fileId, "INSERT_BEFORE", anchor, oldOrdinaryContent, "restore-insert");
+			const anchor = currentWritable.find((block) => block.id)?.id;
+			await edit(
+				client,
+				fileId,
+				anchor ? "INSERT_BEFORE" : "INSERT_AFTER",
+				anchor ?? undefined,
+				oldOrdinaryContent,
+				"restore-insert",
+			);
 		}
 		for (const block of currentWritable) {
 			try {
@@ -129,15 +141,15 @@ async function restoreSnapshot(
 async function edit(
 	client: ToolJsonCaller,
 	fileId: string,
-	action: "INSERT_BEFORE" | "DELETE",
-	id: string,
+	action: "INSERT_BEFORE" | "INSERT_AFTER" | "DELETE",
+	id: string | undefined,
 	content: string | undefined,
 	stage: string,
 ): Promise<void> {
 	await client.callToolJson("smartcanvas.edit", {
 		file_id: fileId,
 		action,
-		id,
+		...(id !== undefined ? { id } : {}),
 		...(content !== undefined ? { content } : {}),
 	}, stage);
 }

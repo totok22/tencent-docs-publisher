@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-09-11
+
+### Fixed
+
+- Append content without an anchor when a Tencent page is empty or contains only child Pages, instead of trying to insert at a Page block rejected by Tencent.
+- Bump the converter fingerprint so pages published before the Markdown math fix are not incorrectly skipped as unchanged.
+
 ## [0.1.5] - 2026-09-11
 
 ### Fixed
