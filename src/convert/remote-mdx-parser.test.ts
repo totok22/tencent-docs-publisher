@@ -36,6 +36,22 @@ describe("remote MDX parser", () => {
 		]);
 	});
 
+	it("keeps a sole deployed child Page when the response omits the current-page wrapper", () => {
+		const parsed = parseRemoteMdx(`---
+title: 测试1
+---
+
+<Page id="child-2">
+  测试2
+</Page>`, "parent-1");
+		expect(parsed.pageId).toBe("parent-1");
+		expect(parsed.directChildPages).toEqual([{
+			pageId: "child-2",
+			title: "测试2",
+			raw: '<Page id="child-2">\n  测试2\n</Page>',
+		}]);
+	});
+
 	it("does not mistake nested block content for a Page title", () => {
 		const parsed = parseRemoteMdx(`<Page id="root">
 <Page id="child"><Paragraph id="p">正文，不是标题</Paragraph></Page>

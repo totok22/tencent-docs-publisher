@@ -35,9 +35,12 @@ export interface ParsedRemotePage {
 export function parseRemoteMdx(content: string, expectedPageId?: string): ParsedRemotePage {
 	const { roots, unsafe } = parseElements(content);
 	const pages = flatten(roots).filter((element) => element.name === "Page");
-	const wrapper =
-		pages.find((page) => page.attributes.id === expectedPageId) ??
-		(roots.length === 1 && roots[0]?.name === "Page" ? roots[0] : null);
+	const matchingWrapper = expectedPageId
+		? pages.find((page) => page.attributes.id === expectedPageId)
+		: undefined;
+	const wrapper = matchingWrapper ?? (
+		!expectedPageId && roots.length === 1 && roots[0]?.name === "Page" ? roots[0] : null
+	);
 	const blockElements = wrapper ? wrapper.children : roots;
 	const directPages = blockElements.filter((element) => element.name === "Page");
 

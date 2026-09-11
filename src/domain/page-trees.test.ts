@@ -72,7 +72,7 @@ describe("remote page tree", () => {
 	it("discovers two levels using complete reads and does not trust top-level children", async () => {
 		const content: Record<string, string> = {
 			root: '<Page id="root"><Page id="a" title="A"><Page id="wrong" title="nested" /></Page><Page id="b" title="B" /></Page>',
-			a: '<Page id="a"><Page id="a1" title="A1" /></Page>',
+			a: '---\ntitle: A\n---\n\n<Page id="a1">A1</Page>',
 			b: '<Page id="b"><Paragraph id="p">B</Paragraph></Page>',
 			a1: '<Page id="a1"><Paragraph id="q">A1</Paragraph></Page>',
 		};
