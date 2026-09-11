@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Support the deployed Tencent Docs `top_level_pages[].id` root-page response and titles encoded in the page `element` field.
 - Reflect selected document IDs in the setup input and prevent duplicate project creation requests.
+- Add the official Tencent Docs Token acquisition link to settings and documentation.
 
 ## [0.1.0] - 2026-09-11
 

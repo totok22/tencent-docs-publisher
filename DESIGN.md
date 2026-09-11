@@ -551,6 +551,7 @@ Token 输入允许粘贴，不显示完整已保存值，错误紧邻输入框�
 ### 12.1 账户
 
 - Token 配置状态；
+- 打开腾讯文档官方 Token 获取页面 `https://docs.qq.com/scenario/open-claw.html?nlc=1`；
 - 测试连接；
 - 替换 Token；
 - 清除 Token。

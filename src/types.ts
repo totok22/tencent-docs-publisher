@@ -1,5 +1,6 @@
 export const DATA_SCHEMA_VERSION = 1;
 export const TENCENT_MCP_ENDPOINT = "https://docs.qq.com/openapi/mcp";
+export const TENCENT_TOKEN_URL = "https://docs.qq.com/scenario/open-claw.html?nlc=1";
 export const TOKEN_SECRET_ID = "tencent-docs-publisher-token";
 
 export interface RemotePageBinding {

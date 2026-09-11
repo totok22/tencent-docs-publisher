@@ -39,7 +39,7 @@ BRAT 从 GitHub Release 下载 `main.js`、`manifest.json` 和 `styles.css`。�
 ## 使用
 
 1. 启用插件后，打开“设置 → Tencent Docs Publisher”；
-2. 粘贴腾讯文档 Token，保存并执行只读连接测试；
+2. 从[腾讯文档官方授权页面](https://docs.qq.com/scenario/open-claw.html?nlc=1)获取 Token，在设置中粘贴、保存并执行只读连接测试；
 3. 从命令面板创建发布项目，选择总览 Markdown，并绑定腾讯智能文档及其已有子页面；
 4. 使用快速预览或刷新后预览检查变化，再执行单页或整棵树发布。
 
@@ -70,7 +70,7 @@ git push origin main --follow-tags
 
 [GitHub Actions 发布工作流](.github/workflows/release.yml)会验证标签、清单和包版本一致，运行完整检查并生成草稿 Release。确认三个发布资产无误后发布草稿，BRAT 即可发现该版本。
 
-Token 只保存在 Obsidian `SecretStorage`，不会写入 Vault、`data.json` 或日志。网络请求固定发送到 `https://docs.qq.com/openapi/mcp`。
+Token 获取地址固定为 `https://docs.qq.com/scenario/open-claw.html?nlc=1`。Token 只保存在 Obsidian `SecretStorage`，不会写入 Vault、`data.json` 或日志。网络请求固定发送到 `https://docs.qq.com/openapi/mcp`。
 
 ## 数据与安全
 

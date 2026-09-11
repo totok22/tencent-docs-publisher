@@ -1,6 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type TencentDocsPublisherPlugin from "../main";
-import { TENCENT_MCP_ENDPOINT } from "../types";
+import { TENCENT_MCP_ENDPOINT, TENCENT_TOKEN_URL } from "../types";
 
 export class TencentDocsSettingTab extends PluginSettingTab {
 	constructor(app: App, private readonly plugin: TencentDocsPublisherPlugin) {
@@ -17,6 +17,10 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 			text: `固定服务地址：${TENCENT_MCP_ENDPOINT}`,
 			cls: "setting-item-description",
 		});
+		new Setting(containerEl)
+			.setName("获取腾讯文档 Token")
+			.setDesc("在腾讯文档官方授权页面获取插件所需 Token。")
+			.addButton((button) => button.setButtonText("打开授权页面").onClick(() => window.open(TENCENT_TOKEN_URL)));
 
 		let pendingToken = "";
 		new Setting(containerEl)
