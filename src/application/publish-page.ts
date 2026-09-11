@@ -36,8 +36,14 @@ export async function publishPreparedPage(
 	if (writable.some((block) => !block.id)) throw new Error("远端普通内容块缺少 Block ID，无法安全替换。");
 	const unwritable = describeUnwritablePage(project, preflight);
 	if (unwritable) throw new PublisherError(unwritable, "EMPTY_SUB_PAGE", "insert-page-content");
-	const placement = planContentPlacement(generatedMdx, preflight.conversion.pageLinks, before, project);
-	for (const insert of placement.inserts) assertNoPlaceholders(insert.text);
+	const isRootPage = binding.pageId === project.remoteRootPageId;
+	const placement = planContentPlacement(generatedMdx, preflight.conversion.pageLinks, before, project, isRootPage);
+	for (const insert of placement.inserts) {
+		assertNoPlaceholders(insert.text);
+		if (insert.anchorId === null && !isRootPage) {
+			throw new Error("内部错误：拒绝把子页面的内容追加到文档根页面，已停止写入。");
+		}
+	}
 	const expectedChildIds = before.directChildPages.map((page) => page.pageId);
 	let mutated = false;
 	let remoteHash: string;
@@ -47,7 +53,7 @@ export async function publishPreparedPage(
 				await edit(
 					client,
 					project.remoteFileId,
-					insert.anchorId ? "INSERT_BEFORE" : "INSERT_AFTER",
+					insert.anchorId === null || insert.position === "after" ? "INSERT_AFTER" : "INSERT_BEFORE",
 					insert.anchorId ?? undefined,
 					insert.text,
 					"insert-page-content",

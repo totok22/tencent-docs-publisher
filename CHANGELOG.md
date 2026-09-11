@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-09-11
+
+### Fixed
+
+- Place text that follows the last child page card of the document root directly below that card; the previous logic merged it into an earlier block.
+- Warn instead of silently misplacing text that belongs above a leading card or below a trailing card inside a sub page, and never fall back to an anchorless insert on a sub page.
+
 ## [0.1.9] - 2026-09-11
 
 ### Fixed

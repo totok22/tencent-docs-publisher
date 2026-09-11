@@ -268,8 +268,8 @@ describe("single page publishing", () => {
 			{ file_id: "file", action: "DELETE", id: "old" },
 		]);
 		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain("连在一起");
-		expect(result.warnings[0]).toContain("拖到正文该在的位置");
+		expect(result.warnings[0]).toContain("紧挨在一起");
+		expect(result.warnings[0]).toContain("往下拖");
 	});
 
 
@@ -300,6 +300,85 @@ describe("single page publishing", () => {
 		expect(inserted).toContain("child");
 		expect(inserted).toContain("<Table>");
 		expect(operations[1]).toEqual({ file_id: "file", action: "DELETE", id: "old" });
+	});
+
+
+	it("appends text that follows the last card of the document root", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="root"><Paragraph id="old">old</Paragraph><Page id="child" title="Child" /></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "[[child.md]]\n\n卡片下方的正文"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target === "child.md" ? "child.md" : null; },
+		};
+		project.pageMap["child.md"] = { pageId: "child", parentPageId: "root", localTitle: "Child", remoteTitle: "Child" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(operations).toEqual([
+			{ file_id: "file", action: "INSERT_AFTER", content: "卡片下方的正文" },
+			{ file_id: "file", action: "DELETE", id: "old" },
+		]);
+		expect(result.warnings).toEqual([]);
+	});
+
+	it("never appends to the document end for a sub page and warns instead", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="child"><Paragraph id="own">own</Paragraph><Page id="grand" title="Grand" /></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "[[grand.md]]\n\n想要写在卡片下方的正文"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target === "grand.md" ? "grand.md" : null; },
+		};
+		project.pageMap["index.md"] = { pageId: "child", parentPageId: "root", localTitle: "Index", remoteTitle: "Child" };
+		project.pageMap["grand.md"] = { pageId: "grand", parentPageId: "child", localTitle: "Grand", remoteTitle: "Grand" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(operations).toEqual([
+			{ file_id: "file", action: "INSERT_AFTER", id: "own", content: "想要写在卡片下方的正文" },
+			{ file_id: "file", action: "DELETE", id: "own" },
+		]);
+		expect(operations.some((operation) => operation.action === "INSERT_AFTER" && operation.id === undefined)).toBe(false);
+		expect(result.warnings[0]).toContain("卡片已经是这一页的最后一块");
+	});
+
+	it("warns when leading text has no room above the first card", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="root"><Page id="child" title="Child" /><Paragraph id="old">old</Paragraph></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "开头正文\n\n[[child.md]]"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target === "child.md" ? "child.md" : null; },
+		};
+		project.pageMap["child.md"] = { pageId: "child", parentPageId: "root", localTitle: "Child", remoteTitle: "Child" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		expect(preflight.warnings.some((warning) => warning.includes("无法在卡片上方插入内容"))).toBe(true);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(operations[0]).toEqual({ file_id: "file", action: "INSERT_BEFORE", id: "old", content: "开头正文" });
+		expect(result.warnings[0]).toContain("排到了卡片下方");
 	});
 
 	it("deletes only ordinary blocks and verifies that child Page order is retained", async () => {

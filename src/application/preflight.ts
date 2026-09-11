@@ -93,7 +93,8 @@ export async function preflightPage(
 			if (parsedRemote.hasUnsafeSyntax) errors.push("远端页面包含无法安全解析的 MDX，已阻止写入。");
 			const unwritable = describeUnwritablePage(project, { localPath, conversion, parsedRemote });
 			if (unwritable) remoteBlockers.push(unwritable);
-			remoteBlockers.push(...planContentPlacement(conversion.mdx, conversion.pageLinks, parsedRemote, project).warnings);
+			const isRootPage = binding.pageId === project.remoteRootPageId;
+			remoteBlockers.push(...planContentPlacement(conversion.mdx, conversion.pageLinks, parsedRemote, project, isRootPage).warnings);
 		} catch (error) {
 			errors.push(error instanceof Error ? error.message : "远端页面读取失败。");
 		}
