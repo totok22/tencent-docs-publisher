@@ -18,11 +18,11 @@ const STATUS_ICON: Record<PagePreflight["status"], string> = {
 };
 
 const STATUS_HINT: Record<PagePreflight["status"], string> = {
-	changed: "发布会用本地内容替换这一页当前的正文。",
-	unchanged: "本地和远端都没有变化，发布会跳过这一页。",
-	conflict: "上次发布之后，腾讯文档里的这一页又被改动过（可能是手动编辑）。要用本地版本覆盖它，需要在下面勾选确认。",
-	unbound: "这篇笔记还没有对应到腾讯文档里的页面，请先用「页面绑定」完成绑定。",
-	error: "请先按下面的提示处理，再重新执行发布前检查。",
+	changed: "本地有改动，发布将更新该页面。",
+	unchanged: "内容一致，发布将跳过。",
+	conflict: "远端页面存在新的修改，覆盖需确认。",
+	unbound: "尚未绑定对应页面，请先完成绑定。",
+	error: "检查未通过，请处理后重试。",
 };
 
 export class PreviewModal extends Modal {
@@ -40,12 +40,12 @@ export class PreviewModal extends Modal {
 		const refreshed = this.mode === "refreshed";
 		this.titleEl.setText(refreshed ? "发布前检查" : "发布预览（仅本地）");
 		if (refreshed) {
-			this.contentEl.createEl("p", { text: "下面的状态来自刚刚读取的腾讯文档内容；只有点「开始发布」才会写入。" });
+			this.contentEl.createEl("p", { text: "已获取远端最新状态，确认后开始发布。" });
 		} else {
-			this.contentEl.createEl("p", { text: "离线预览：只显示本地会生成的内容，不读取腾讯文档，也不会写入任何内容。" });
+			this.contentEl.createEl("p", { text: "本地离线预览（未连接远端）。" });
 			const cacheTime = this.previews.find((preview) => preview.cacheFetchedAt)?.cacheFetchedAt;
 			this.contentEl.createEl("p", {
-				text: cacheTime ? "远端信息来自 " + new Date(cacheTime).toLocaleString() + " 的缓存。" : "没有远端缓存，只能看到本地结果。",
+				text: cacheTime ? "远端信息缓存于 " + new Date(cacheTime).toLocaleString() : "暂无远端缓存",
 			});
 		}
 		if (this.summary) this.contentEl.createEl("p", { text: this.summary });
@@ -67,13 +67,13 @@ export class PreviewModal extends Modal {
 		let overwriteConflicts = false;
 		if (conflicts.length) {
 			new Setting(this.contentEl)
-				.setName("覆盖 " + conflicts.length + " 个被改动过的页面")
-				.setDesc("勾选后这些页面会用本地内容替换腾讯文档里的现有内容；不勾选则只发布其他页面。")
+				.setName("允许覆盖 " + conflicts.length + " 个被修改页面")
+				.setDesc("勾选后将覆盖远端修改。")
 				.addToggle((toggle) => toggle.setValue(false).onChange((value) => { overwriteConflicts = value; }));
 		}
 		if (blocked.length) {
 			this.contentEl.createEl("p", {
-				text: "有 " + blocked.length + " 个页面尚未就绪（未绑定或检查未通过），发布必须先把它们处理完。",
+				text: "有 " + blocked.length + " 个页面尚未就绪，需处理后再发布。",
 				cls: "mod-warning",
 			});
 			return;

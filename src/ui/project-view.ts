@@ -51,7 +51,7 @@ export class ProjectView extends ItemView {
 		container.empty();
 		container.createEl("h2", { text: "腾讯文档发布管理" });
 		if (!this.plugin.data.projects.length) {
-			container.createEl("p", { text: "还没有发布项目。在 Markdown 文件或文件夹上右键，选择「用…新建发布项目」即可开始。" });
+			container.createEl("p", { text: "暂无发布项目。可在 Markdown 文件或文件夹右键菜单中新建。" });
 		}
 		for (const project of this.plugin.data.projects) {
 			const cache = this.plugin.data.remoteTreeCaches[project.id];
@@ -63,7 +63,7 @@ export class ProjectView extends ItemView {
 			const details = [
 				"已绑定 " + Object.keys(project.pageMap).length + " 页",
 				published ? "上次发布 " + new Date(published).toLocaleString() : "尚未发布过",
-				cache ? "远端信息更新于 " + new Date(cache.fetchedAt).toLocaleString() : "还没有远端信息",
+				cache ? "远端信息更新于 " + new Date(cache.fetchedAt).toLocaleString() : "暂无远端信息",
 			];
 			new Setting(container)
 				.setName(project.sourceRootPath)
@@ -72,14 +72,14 @@ export class ProjectView extends ItemView {
 				.addButton((button) => button.setCta().setButtonText("发布").onClick(() => this.plugin.publishProject(project.id)))
 				.addExtraButton((button) => button.setIcon("refresh-cw").setTooltip("刷新远端页面树并管理绑定").onClick(() => this.plugin.openBindingManager(project.id)))
 				.addExtraButton((button) => button.setIcon("external-link").setTooltip("在腾讯文档中打开").onClick(() => this.plugin.openProjectDocument(project.id)))
-				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除本地项目（不会删除腾讯文档）").onClick(async () => {
+				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除项目").onClick(async () => {
 					await this.plugin.removeProject(project.id);
 					this.render();
 				}));
 		}
 		container.createEl("h3", { text: "最近任务" });
 		const tasks = this.plugin.data.recentTasks.slice(0, 20);
-		if (!tasks.length) container.createEl("p", { text: "还没有发布记录。" });
+		if (!tasks.length) container.createEl("p", { text: "暂无发布记录。" });
 		for (const task of tasks) {
 			const project = this.plugin.data.projects.find((item) => item.id === task.projectId);
 			const stage = TASK_STAGE[task.stage] ?? `其他步骤（${task.stage}）`;

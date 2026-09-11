@@ -1,6 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type TencentDocsPublisherPlugin from "../main";
-import { TENCENT_MCP_ENDPOINT, TENCENT_TOKEN_URL } from "../types";
+import { TENCENT_TOKEN_URL } from "../types";
 
 export class TencentDocsSettingTab extends PluginSettingTab {
 	constructor(app: App, private readonly plugin: TencentDocsPublisherPlugin) {
@@ -12,7 +12,7 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		new Setting(containerEl).setName("腾讯文档发布器").setHeading();
 		containerEl.createEl("p", {
-			text: "把 Obsidian 里的 Markdown 手动发布到腾讯智能文档。插件不会监听保存，也不会自动同步。",
+			text: "将 Obsidian 中的 Markdown 笔记发布到腾讯智能文档。",
 			cls: "setting-item-description",
 		});
 
@@ -25,7 +25,7 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 		let pendingToken = "";
 		new Setting(containerEl)
 			.setName("腾讯文档 token")
-			.setDesc(this.plugin.tokenStore.hasToken() ? "已保存。要更换时粘贴新值再点保存。" : "还没有配置。")
+			.setDesc(this.plugin.tokenStore.hasToken() ? "已配置" : "未配置")
 			.addText((text) => {
 				text.inputEl.type = "password";
 				text.setPlaceholder("粘贴 token").onChange((value) => {
@@ -57,19 +57,18 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 					this.display();
 				}),
 			);
-		containerEl.createEl("p", { text: "服务地址固定为 " + TENCENT_MCP_ENDPOINT + "，不可修改。", cls: "setting-item-description" });
 
 		new Setting(containerEl).setName("新项目的默认行为").setHeading();
-		this.addToggle("默认请求全员可读", "只请求可读，永远不会设置成全员可编辑。", "publicRead");
-		this.addToggle("把「![[Markdown]]」当作子页面", "关闭时，嵌入的 Markdown 内容会直接写在当前页面里。", "embeddedMarkdownAsPage");
-		this.addToggle("遇到冲突时停下来", "远端这一页在上次发布后又被改动过时，默认阻止覆盖；关闭后发布会直接覆盖，不再逐次确认。", "stopOnConflict");
-		this.addToggle("跳过没有变化的页面", "本地内容和资源都没变时跳过，减少写入。", "skipUnchanged");
-		this.addNumber("最大递归深度", "总览树最多往下跟几层链接，范围 1–32，默认 8。", "maxDepth", 1, 32);
-		this.addNumber("最大页面数", "一次发布最多包含多少篇笔记，范围 1–2000，默认 200。", "maxNotes", 1, 2_000);
+		this.addToggle("默认请求全员可读", "新建项目时默认开启公开只读权限。", "publicRead");
+		this.addToggle("把「![[Markdown]]」当作子页面", "嵌入的 Markdown 作为独立子页面发布；关闭时直接展开在当前页。", "embeddedMarkdownAsPage");
+		this.addToggle("遇到冲突时停下来", "远端内容被修改时暂停发布并等待确认。", "stopOnConflict");
+		this.addToggle("跳过没有变化的页面", "内容无变动时跳过发布。", "skipUnchanged");
+		this.addNumber("最大递归深度", "链接抓取最大层数，范围 1–32，默认 8。", "maxDepth", 1, 32);
+		this.addNumber("最大页面数", "单次发布最大笔记数，范围 1–2000，默认 200。", "maxNotes", 1, 2_000);
 
 		new Setting(containerEl)
 			.setName("在侧边栏显示入口")
-			.setDesc("在左侧工具栏显示发布管理按钮。")
+			.setDesc("在左侧工具栏显示发布管理图标。")
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.data.showRibbonIcon).onChange(async (value) => {
 					this.plugin.data.showRibbonIcon = value;
@@ -87,7 +86,7 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 				.setDesc("已绑定 " + Object.keys(project.pageMap).length + " 页")
 				.addButton((button) => button.setButtonText("页面绑定").onClick(() => this.plugin.openBindingManager(project.id)))
 				.addExtraButton((button) => button.setIcon("external-link").setTooltip("在腾讯文档中打开").onClick(() => this.plugin.openProjectDocument(project.id)))
-				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除本地项目（不会删除腾讯文档）").onClick(async () => {
+				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除项目").onClick(async () => {
 					await this.plugin.removeProject(project.id);
 					this.display();
 				}));
@@ -96,7 +95,7 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("诊断").setHeading();
 		new Setting(containerEl)
 			.setName("发布记录")
-			.setDesc("保存 " + this.plugin.data.recentTasks.length + " 条脱敏记录，可在发布管理面板查看。token、正文和上传地址不会写入记录。")
+			.setDesc("查看最近的发布任务历史。")
 			.addButton((button) =>
 				button.setButtonText("清理远端缓存").onClick(async () => {
 					this.plugin.data.remoteTreeCaches = {};

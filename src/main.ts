@@ -141,12 +141,12 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	async removeProject(projectId: string): Promise<void> {
-		if (!window.confirm("只移除本地的发布项目？腾讯文档不会被删除。")) return;
+		if (!window.confirm("确认移除该本地发布项目？")) return;
 		this.data.projects = this.data.projects.filter((project) => project.id !== projectId);
 		delete this.data.remoteTreeCaches[projectId];
 		this.rebuildProjectIndex();
 		await this.savePluginData();
-		new Notice("已移除本地发布项目，腾讯文档没有改动。");
+		new Notice("已移除本地发布项目。");
 	}
 
 	private registerCommands(): void {
@@ -204,11 +204,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 					const project = this.projectForPath(file.path);
 					const bound = Boolean(project?.pageMap[file.path]);
 					if (bound) {
-						this.addMenuItem(menu, "腾讯文档：检查并发布这篇笔记", "cloud-upload", () => this.publishFile(file));
-						this.addMenuItem(menu, "腾讯文档：只看这篇笔记的变化", "scan-eye", () => this.previewFile(file));
-						if (project) this.addMenuItem(menu, "腾讯文档：检查并发布整个文档树", "folder-tree", () => this.publishProject(project.id));
+						this.addMenuItem(menu, "腾讯文档：发布当前笔记", "cloud-upload", () => this.publishFile(file));
+						this.addMenuItem(menu, "腾讯文档：预览当前笔记", "scan-eye", () => this.previewFile(file));
+						if (project) this.addMenuItem(menu, "腾讯文档：发布文档树", "folder-tree", () => this.publishProject(project.id));
 					} else {
-						this.addMenuItem(menu, "腾讯文档：用这篇笔记新建发布项目…", "folder-tree", () => this.openProjectSetup(file));
+						this.addMenuItem(menu, "腾讯文档：新建发布项目…", "folder-tree", () => this.openProjectSetup(file));
 					}
 					if (project) {
 						this.addMenuItem(menu, "腾讯文档：页面绑定…", "link", () => this.openBindingManager(project.id));
@@ -216,11 +216,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 					}
 				} else if (file instanceof TFolder) {
 					const project = this.projectIndex.projectForAllowedRoot(file.path);
-					this.addMenuItem(menu, "腾讯文档：用这个文件夹新建发布项目…", "folder-tree", () => this.createProjectFromFolder(file));
+					this.addMenuItem(menu, "腾讯文档：新建发布项目…", "folder-tree", () => this.createProjectFromFolder(file));
 					if (project) {
-						this.addMenuItem(menu, "腾讯文档：检查并发布这个项目", "cloud-upload", () => this.publishProject(project.id));
-						this.addMenuItem(menu, "腾讯文档：只看这个项目的变化", "scan-eye", () => this.previewProject(project.id));
-						this.addMenuItem(menu, "腾讯文档：刷新远端页面树与绑定", "refresh-cw", () => this.openBindingManager(project.id));
+						this.addMenuItem(menu, "腾讯文档：发布项目", "cloud-upload", () => this.publishProject(project.id));
+						this.addMenuItem(menu, "腾讯文档：预览项目", "scan-eye", () => this.previewProject(project.id));
+						this.addMenuItem(menu, "腾讯文档：刷新页面树与绑定", "refresh-cw", () => this.openBindingManager(project.id));
 					}
 				}
 			}),
@@ -446,7 +446,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				project.pageMap = bindingsFromSelections(result.proposals, selections, result.cache.nodes, project.pageMap);
 				this.rebuildProjectIndex();
 				await this.savePluginData();
-				new Notice("绑定已保存，还没有发布。");
+				new Notice("绑定已保存。");
 			}).open();
 			await this.savePluginData();
 		} catch (error) {
@@ -555,7 +555,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			}
 			const summary = mode === "refreshed"
 				? this.summarizePreflight(prepared)
-				: "离线预览：只生成内容，不读取腾讯文档。";
+				: "离线预览";
 			new PreviewModal(this.app, prepared.pages, mode, allowPublish ? async (requested) => {
 				const progress = new ProgressModal(this.app);
 				progress.open();

@@ -22,11 +22,11 @@ export class BindingModal extends Modal {
 	onOpen(): void {
 		this.titleEl.setText("页面绑定");
 		this.contentEl.createEl("p", {
-			text: "把每篇本地笔记对应到腾讯文档里的一个页面。保存只更新插件记录，不会修改腾讯文档。",
+			text: "设置本地笔记与腾讯文档页面的对应关系。",
 		});
 		if (this.proposals.some((proposal) => proposal.status === "missing")) {
 			this.contentEl.createEl("p", {
-				text: "标着“还没有对应页面”的条目，需要先在腾讯文档里用子页面卡片建好同名页面，再用「刷新远端页面树」重新匹配。",
+				text: "未匹配的页面需先在腾讯文档中创建对应子页面，再刷新匹配。",
 			});
 		}
 		const selections: Record<string, string> = {};
@@ -54,7 +54,7 @@ export class BindingModal extends Modal {
 		const initiallyBound = new Set(this.proposals.map((proposal) => proposal.remotePageId).filter(Boolean));
 		const unbound = remoteNodes.filter((node) => !initiallyBound.has(node.pageId));
 		if (unbound.length) {
-			this.contentEl.createEl("h3", { text: "腾讯文档里多出来的页面（发布不会动它们）" });
+			this.contentEl.createEl("h3", { text: "远端其他页面" });
 			for (const node of unbound) this.contentEl.createEl("p", { text: "○ " + node.title + "（" + node.pageId + "）" });
 		}
 		new Setting(this.contentEl).addButton((button) =>

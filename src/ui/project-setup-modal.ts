@@ -23,7 +23,7 @@ export class ProjectSetupModal extends Modal {
 	onOpen(): void {
 		this.titleEl.setText("新建腾讯文档发布项目");
 		this.contentEl.createEl("p", {
-			text: "选一个腾讯智能文档作为发布目标，插件会读取它已有的子页面，再把这篇 Markdown 和它链接到的笔记对应过去。",
+			text: "选择目标腾讯智能文档，建立页面对应关系。",
 		});
 		const folder = this.sourceFile.parent?.path === "/" ? "" : this.sourceFile.parent?.path ?? "";
 		const value: ProjectSetupValue = {
@@ -35,12 +35,12 @@ export class ProjectSetupModal extends Modal {
 		new Setting(this.contentEl).setName("发布树根节点").setDesc(this.sourceFile.path);
 		new Setting(this.contentEl)
 			.setName("允许跟随的文件夹")
-			.setDesc("只有这个范围内的 Markdown 才会被当成子页面；范围外的链接只保留文字。")
+			.setDesc("限制子页面引用的目录范围。")
 			.addText((text) => text.setValue(value.allowedRootPath).onChange((input) => { value.allowedRootPath = input.trim(); }));
 		let fileIdInput: TextComponent | null = null;
 		const fileIdSetting = new Setting(this.contentEl)
-			.setName("目标智能文档 file_ID")
-			.setDesc("填文档的内部 file_ID，不是网页地址里的那串字符。")
+			.setName("目标文档 ID (file_ID)")
+			.setDesc("腾讯智能文档的 file_ID。")
 			.addText((text) => {
 				fileIdInput = text;
 				text.setPlaceholder("粘贴已知的 file_ID").onChange((input) => { value.remoteFileId = input.trim(); });
@@ -48,8 +48,8 @@ export class ProjectSetupModal extends Modal {
 		const resultsEl = this.contentEl.createDiv("tencent-docs-publisher-document-results");
 		let query = "";
 		new Setting(this.contentEl)
-			.setName("或者直接挑一个")
-			.setDesc("点「最近」列出最近编辑过的智能文档，或输入标题后点「搜索」。选中结果会自动填入上面的 file_ID。")
+			.setName("从已有文档中选择")
+			.setDesc("从最近文档列表或通过标题搜索选择文档。")
 			.addText((text) => text.setPlaceholder("文档标题").onChange((input) => { query = input.trim(); }))
 			.addButton((button) => button.setButtonText("最近").onClick(() => void this.renderChoices(resultsEl, this.findDocuments(), value, fileIdSetting, fileIdInput)))
 			.addButton((button) => button.setButtonText("搜索").onClick(() => {
@@ -58,8 +58,8 @@ export class ProjectSetupModal extends Modal {
 			}));
 		let newTitle = this.sourceFile.basename;
 		new Setting(this.contentEl)
-			.setName("或者新建一个空的智能文档")
-			.setDesc("只会新建这份文档本身，子页面仍然要在腾讯文档里手动建好。")
+			.setName("新建智能文档")
+			.setDesc("在腾讯文档中新建一篇空文档作为发布目标。")
 			.addText((text) => text.setValue(newTitle).onChange((input) => { newTitle = input.trim(); }))
 			.addButton((button) => button.setButtonText("新建").onClick(async () => {
 				if (!newTitle) { new Notice("请填一个文档标题。"); return; }
@@ -74,7 +74,7 @@ export class ProjectSetupModal extends Modal {
 			}));
 		new Setting(this.contentEl)
 			.setName("请求全员可读")
-			.setDesc("只请求只读权限，不会设置成全员可编辑。")
+			.setDesc("开启公开只读权限。")
 			.addToggle((toggle) => toggle.setValue(value.publicRead).onChange((input) => { value.publicRead = input; }));
 		new Setting(this.contentEl).addButton((button) =>
 			button.setCta().setButtonText("创建并读取页面树").onClick(async () => {
