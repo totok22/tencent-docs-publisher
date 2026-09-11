@@ -4,8 +4,9 @@ import { requestPublicRead, type PermissionRequestResult } from "../tencent/perm
 import { PublishAssetResolver } from "../tencent/assets";
 import type { ToolJsonCaller } from "../tencent/smartcanvas";
 import type { PublishProject, TencentDocsPublisherData } from "../types";
-import { preflightPage, type PagePreflight, type PreflightVaultReader } from "./preflight";
-import { describeUnwritablePage, publishPreparedPage } from "./publish-page";
+	import { preflightPage, type PagePreflight, type PreflightVaultReader } from "./preflight";
+import { describeUnwritablePage } from "./content-placement";
+import { publishPreparedPage } from "./publish-page";
 import { refreshBindings } from "./refresh-bindings";
 
 export interface RequestBudget {
@@ -34,6 +35,7 @@ export interface ProjectPublishResult {
 	published: string[];
 	skipped: string[];
 	skipReasons: Record<string, string>;
+	pageWarnings: Record<string, string[]>;
 	permissions: PermissionRequestResult[];
 	cancelled: boolean;
 }
@@ -110,6 +112,7 @@ export async function executeProjectPublish(
 	let skipped: string[] = [];
 	let permissions: PermissionRequestResult[] = [];
 	const skipReasons: Record<string, string> = {};
+	const pageWarnings: Record<string, string[]> = {};
 	try {
 		for (const page of preflight.pages) {
 			const reason = describeUnwritablePage(project, page);
@@ -147,7 +150,8 @@ export async function executeProjectPublish(
 			const item = rendered.get(order[index]!);
 			if (!item) continue;
 			options.onProgress?.({ stage: "pages", completed: index, total: order.length, pagePath: item.page.localPath });
-			await publishPreparedPage(client, project, item.page, item.mdx, options.allowConflicts?.has(item.page.localPath));
+			const publishedPage = await publishPreparedPage(client, project, item.page, item.mdx, options.allowConflicts?.has(item.page.localPath));
+			if (publishedPage.warnings.length) pageWarnings[item.page.localPath] = publishedPage.warnings;
 			published.push(item.page.localPath);
 			for (const id of item.pdfIds) pdfIds.add(id);
 			await options.saveState?.();
@@ -159,11 +163,11 @@ export async function executeProjectPublish(
 		}
 		await options.saveState?.();
 		skipped = preflight.pages.filter((page) => !rendered.has(page.localPath)).map((page) => page.localPath);
-		return { published, skipped, skipReasons, permissions, cancelled: false };
+		return { published, skipped, skipReasons, pageWarnings, permissions, cancelled: false };
 	} catch (error) {
 		if (options.signal?.aborted) {
 			skipped = preflight.pages.filter((page) => !published.includes(page.localPath)).map((page) => page.localPath);
-			return { published, skipped, skipReasons, permissions, cancelled: true };
+			return { published, skipped, skipReasons, pageWarnings, permissions, cancelled: true };
 		}
 		throw error;
 	} finally {

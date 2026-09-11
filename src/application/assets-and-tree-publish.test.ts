@@ -147,7 +147,7 @@ async function projectFixture() {
 		pages.push({
 			localPath: path, status: "changed", sourceHash: `${pageId}-source`,
 			remoteHash: await remoteContentFingerprint(content, pageId), remoteFresh: true, cacheFetchedAt: null,
-			conversion: { mdx: "new", assets: [], warnings: [] }, assets: [], warnings: [], errors: [],
+			conversion: { mdx: "new", assets: [], pageLinks: [], warnings: [] }, assets: [], warnings: [], errors: [],
 			remoteContent: content, parsedRemote: parseRemoteMdx(content, pageId),
 		});
 	}

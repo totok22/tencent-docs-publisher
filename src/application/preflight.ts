@@ -4,6 +4,7 @@ import { sha256Hex } from "../domain/hash";
 import { isWithinRoot } from "../domain/local-page-tree";
 import { readCompletePage, type ToolJsonCaller } from "../tencent/smartcanvas";
 import type { PublishProject, RemotePageBinding, RemoteTreeCache } from "../types";
+import { describeUnwritablePage, planContentPlacement } from "./content-placement";
 
 export const CONVERTER_VERSION = "0.4.2";
 
@@ -53,6 +54,7 @@ export async function preflightPage(
 	const conversion = convertMarkdownToMdx(markdown, {
 		resolvePath: (target) => reader.resolvePath(target, localPath),
 		embeddedMarkdownAsPage,
+		childPagePaths: Object.keys(project.pageMap),
 	});
 	const errors: string[] = [];
 	const remoteBlockers: string[] = [];
@@ -89,12 +91,9 @@ export async function preflightPage(
 			remoteHash = await remoteContentFingerprint(read.content, binding.pageId);
 			remoteFresh = true;
 			if (parsedRemote.hasUnsafeSyntax) errors.push("远端页面包含无法安全解析的 MDX，已阻止写入。");
-			const hasOwnBlock = parsedRemote.blocks.some((block) => block.id && !block.preserve);
-			if (conversion.mdx.trim() && binding.pageId !== project.remoteRootPageId && !hasOwnBlock) {
-				remoteBlockers.push(
-					`子页面“${binding.remoteTitle || binding.localTitle}”在腾讯文档里还没有正文，发布时会被跳过。请先在该子页面里输入任意一个字符作为占位，发布后插件会自动删掉它。`,
-				);
-			}
+			const unwritable = describeUnwritablePage(project, { localPath, conversion, parsedRemote });
+			if (unwritable) remoteBlockers.push(unwritable);
+			remoteBlockers.push(...planContentPlacement(conversion.mdx, conversion.pageLinks, parsedRemote, project).warnings);
 		} catch (error) {
 			errors.push(error instanceof Error ? error.message : "远端页面读取失败。");
 		}

@@ -11,24 +11,24 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		new Setting(containerEl).setName("腾讯文档发布器").setHeading();
-
-		new Setting(containerEl).setName("账户").setHeading();
 		containerEl.createEl("p", {
-			text: `固定服务地址：${TENCENT_MCP_ENDPOINT}`,
+			text: "把 Obsidian 里的 Markdown 手动发布到腾讯智能文档。插件不会监听保存，也不会自动同步。",
 			cls: "setting-item-description",
 		});
+
+		new Setting(containerEl).setName("账户").setHeading();
 		new Setting(containerEl)
-			.setName("获取腾讯文档 Token")
-			.setDesc("在腾讯文档官方授权页面获取插件所需 Token。")
+			.setName("获取腾讯文档 token")
+			.setDesc("在腾讯文档官方授权页面获取插件所需的 token，然后粘贴到下面。")
 			.addButton((button) => button.setButtonText("打开授权页面").onClick(() => window.open(TENCENT_TOKEN_URL)));
 
 		let pendingToken = "";
 		new Setting(containerEl)
-			.setName("腾讯文档 Token")
-			.setDesc(this.plugin.tokenStore.hasToken() ? "已安全保存。输入新值可替换。" : "尚未配置。")
+			.setName("腾讯文档 token")
+			.setDesc(this.plugin.tokenStore.hasToken() ? "已保存。要更换时粘贴新值再点保存。" : "还没有配置。")
 			.addText((text) => {
 				text.inputEl.type = "password";
-				text.setPlaceholder("粘贴 Token").onChange((value) => {
+				text.setPlaceholder("粘贴 token").onChange((value) => {
 					pendingToken = value;
 				});
 			})
@@ -36,10 +36,10 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 				button.setButtonText("保存").onClick(async () => {
 					try {
 						await this.plugin.replaceToken(pendingToken);
-						new Notice("Token 已保存到 Obsidian SecretStorage。");
+						new Notice("token 已保存到 Obsidian 的凭据存储。");
 						this.display();
 					} catch (error) {
-						new Notice(error instanceof Error ? error.message : "Token 保存失败。");
+						new Notice(error instanceof Error ? error.message : "token 保存失败。");
 					}
 				}),
 			)
@@ -53,22 +53,23 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 				button.setButtonText("清除").setWarning().onClick(async () => {
 					this.plugin.clearToken();
 					await this.plugin.savePluginData();
-					new Notice("Token 已清除。");
+					new Notice("token 已清除。");
 					this.display();
 				}),
 			);
+		containerEl.createEl("p", { text: "服务地址固定为 " + TENCENT_MCP_ENDPOINT + "，不可修改。", cls: "setting-item-description" });
 
-		new Setting(containerEl).setName("默认发布行为").setHeading();
-		this.addToggle("新项目默认请求全员可读", "只会请求全员可读，永不设置可编辑。", "publicRead");
-		this.addToggle("将 Markdown 嵌入视为子页面", "关闭时嵌入内容发布在当前页面。", "embeddedMarkdownAsPage");
-		this.addToggle("遇到冲突时停止", "检测到远端人工修改时阻止写入。", "stopOnConflict");
-		this.addToggle("跳过未变化页面", "完整内容与资源哈希均未变化时跳过。", "skipUnchanged");
-		this.addNumber("最大递归深度", "范围 1–32，默认 8。", "maxDepth", 1, 32);
-		this.addNumber("最大发布页面数", "范围 1–2000，默认 200。", "maxNotes", 1, 2_000);
+		new Setting(containerEl).setName("新项目的默认行为").setHeading();
+		this.addToggle("默认请求全员可读", "只请求可读，永远不会设置成全员可编辑。", "publicRead");
+		this.addToggle("把「![[Markdown]]」当作子页面", "关闭时，嵌入的 Markdown 内容会直接写在当前页面里。", "embeddedMarkdownAsPage");
+		this.addToggle("遇到冲突时停下来", "远端这一页在上次发布后又被改动过时，默认阻止覆盖；关闭后发布会直接覆盖，不再逐次确认。", "stopOnConflict");
+		this.addToggle("跳过没有变化的页面", "本地内容和资源都没变时跳过，减少写入。", "skipUnchanged");
+		this.addNumber("最大递归深度", "总览树最多往下跟几层链接，范围 1–32，默认 8。", "maxDepth", 1, 32);
+		this.addNumber("最大页面数", "一次发布最多包含多少篇笔记，范围 1–2000，默认 200。", "maxNotes", 1, 2_000);
 
 		new Setting(containerEl)
-			.setName("显示侧边栏按钮")
-			.setDesc("在左侧工具栏显示发布入口。")
+			.setName("在侧边栏显示入口")
+			.setDesc("在左侧工具栏显示发布管理按钮。")
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.data.showRibbonIcon).onChange(async (value) => {
 					this.plugin.data.showRibbonIcon = value;
@@ -78,15 +79,15 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("发布项目").setHeading();
 		if (this.plugin.data.projects.length === 0) {
-			containerEl.createEl("p", { text: "尚未创建发布项目。", cls: "setting-item-description" });
+			containerEl.createEl("p", { text: "还没有发布项目。", cls: "setting-item-description" });
 		}
 		for (const project of this.plugin.data.projects) {
 			new Setting(containerEl)
 				.setName(project.sourceRootPath)
-				.setDesc(`${project.remoteFileId} · 已绑定 ${Object.keys(project.pageMap).length} 页`)
-				.addButton((button) => button.setButtonText("管理绑定").onClick(() => this.plugin.openBindingManager(project.id)))
-				.addExtraButton((button) => button.setIcon("external-link").setTooltip("打开腾讯文档").onClick(() => this.plugin.openProjectDocument(project.id)))
-				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("仅移除本地项目").onClick(async () => {
+				.setDesc("已绑定 " + Object.keys(project.pageMap).length + " 页")
+				.addButton((button) => button.setButtonText("页面绑定").onClick(() => this.plugin.openBindingManager(project.id)))
+				.addExtraButton((button) => button.setIcon("external-link").setTooltip("在腾讯文档中打开").onClick(() => this.plugin.openProjectDocument(project.id)))
+				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除本地项目（不会删除腾讯文档）").onClick(async () => {
 					await this.plugin.removeProject(project.id);
 					this.display();
 				}));
@@ -94,13 +95,13 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("诊断").setHeading();
 		new Setting(containerEl)
-			.setName("最近发布任务")
-			.setDesc(`保留 ${this.plugin.data.recentTasks.length} 条脱敏记录；Token、正文和上传地址不会记录。`)
+			.setName("发布记录")
+			.setDesc("保存 " + this.plugin.data.recentTasks.length + " 条脱敏记录，可在发布管理面板查看。token、正文和上传地址不会写入记录。")
 			.addButton((button) =>
-				button.setButtonText("清理本地缓存").onClick(async () => {
+				button.setButtonText("清理远端缓存").onClick(async () => {
 					this.plugin.data.remoteTreeCaches = {};
 					await this.plugin.savePluginData();
-					new Notice("远端树缓存已清理。");
+					new Notice("已清理远端页面树缓存，下次会重新读取。");
 				}),
 			);
 	}
@@ -145,3 +146,4 @@ export class TencentDocsSettingTab extends PluginSettingTab {
 			});
 	}
 }
+

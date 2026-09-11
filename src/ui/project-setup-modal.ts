@@ -21,7 +21,10 @@ export class ProjectSetupModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.titleEl.setText("创建腾讯文档发布项目");
+		this.titleEl.setText("新建腾讯文档发布项目");
+		this.contentEl.createEl("p", {
+			text: "选一个腾讯智能文档作为发布目标，插件会读取它已有的子页面，再把这篇 Markdown 和它链接到的笔记对应过去。",
+		});
 		const folder = this.sourceFile.parent?.path === "/" ? "" : this.sourceFile.parent?.path ?? "";
 		const value: ProjectSetupValue = {
 			sourceRootPath: this.sourceFile.path,
@@ -29,54 +32,54 @@ export class ProjectSetupModal extends Modal {
 			remoteFileId: "",
 			publicRead: this.defaultPublicRead,
 		};
-		new Setting(this.contentEl).setName("总览文件").setDesc(this.sourceFile.path);
+		new Setting(this.contentEl).setName("发布树根节点").setDesc(this.sourceFile.path);
 		new Setting(this.contentEl)
-			.setName("允许跟随的根文件夹")
-			.setDesc("链接到该范围外的 Markdown 只保留为普通引用。")
+			.setName("允许跟随的文件夹")
+			.setDesc("只有这个范围内的 Markdown 才会被当成子页面；范围外的链接只保留文字。")
 			.addText((text) => text.setValue(value.allowedRootPath).onChange((input) => { value.allowedRootPath = input.trim(); }));
 		let fileIdInput: TextComponent | null = null;
 		const fileIdSetting = new Setting(this.contentEl)
-			.setName("腾讯智能文档 file_id")
-			.setDesc("必须是内部 file_id，不是从网页 URL 猜出的标识。")
+			.setName("目标智能文档 file_ID")
+			.setDesc("填文档的内部 file_ID，不是网页地址里的那串字符。")
 			.addText((text) => {
 				fileIdInput = text;
-				text.setPlaceholder("输入已知 file_id").onChange((input) => { value.remoteFileId = input.trim(); });
+				text.setPlaceholder("粘贴已知的 file_ID").onChange((input) => { value.remoteFileId = input.trim(); });
 			});
 		const resultsEl = this.contentEl.createDiv("tencent-docs-publisher-document-results");
 		let query = "";
 		new Setting(this.contentEl)
-			.setName("选择已有智能文档")
-			.setDesc("可加载最近文档或按标题搜索；选择结果会填入上方 file_id。")
+			.setName("或者直接挑一个")
+			.setDesc("点「最近」列出最近编辑过的智能文档，或输入标题后点「搜索」。选中结果会自动填入上面的 file_ID。")
 			.addText((text) => text.setPlaceholder("文档标题").onChange((input) => { query = input.trim(); }))
-			.addButton((button) => button.setButtonText("最近").onClick(() => void this.renderChoices(resultsEl, awaitable(() => this.findDocuments()), value, fileIdSetting, fileIdInput)))
+			.addButton((button) => button.setButtonText("最近").onClick(() => void this.renderChoices(resultsEl, this.findDocuments(), value, fileIdSetting, fileIdInput)))
 			.addButton((button) => button.setButtonText("搜索").onClick(() => {
-				if (!query) { new Notice("请输入搜索关键词。"); return; }
-				void this.renderChoices(resultsEl, awaitable(() => this.findDocuments(query)), value, fileIdSetting, fileIdInput);
+				if (!query) { new Notice("请先输入要搜索的标题关键词。"); return; }
+				void this.renderChoices(resultsEl, this.findDocuments(query), value, fileIdSetting, fileIdInput);
 			}));
 		let newTitle = this.sourceFile.basename;
 		new Setting(this.contentEl)
-			.setName("或新建独立智能文档")
-			.setDesc("只新建根智能文档，不会自动创建子页面。")
+			.setName("或者新建一个空的智能文档")
+			.setDesc("只会新建这份文档本身，子页面仍然要在腾讯文档里手动建好。")
 			.addText((text) => text.setValue(newTitle).onChange((input) => { newTitle = input.trim(); }))
 			.addButton((button) => button.setButtonText("新建").onClick(async () => {
-				if (!newTitle) { new Notice("请输入文档标题。"); return; }
+				if (!newTitle) { new Notice("请填一个文档标题。"); return; }
 				try {
 					const created = await this.createRootDocument(newTitle);
 					value.remoteFileId = created.fileId;
 					fileIdInput?.setValue(created.fileId);
-					fileIdSetting.descEl.setText(`已选择新文档：${created.title} (${created.fileId})`);
+					fileIdSetting.descEl.setText("已选中新建的文档：" + created.title + "（" + created.fileId + "）");
 				} catch (error) {
 					new Notice(error instanceof Error ? error.message : "新建文档失败。");
 				}
 			}));
 		new Setting(this.contentEl)
 			.setName("请求全员可读")
-			.setDesc("只请求可读，不会设置全员可编辑。")
+			.setDesc("只请求只读权限，不会设置成全员可编辑。")
 			.addToggle((toggle) => toggle.setValue(value.publicRead).onChange((input) => { value.publicRead = input; }));
 		new Setting(this.contentEl).addButton((button) =>
-			button.setCta().setButtonText("读取页面树并创建").onClick(async () => {
+			button.setCta().setButtonText("创建并读取页面树").onClick(async () => {
 				if (!value.remoteFileId) {
-					new Notice("请输入腾讯智能文档内部 file_id。");
+					new Notice("请先填好目标文档的 file_ID。");
 					return;
 				}
 				button.setDisabled(true);
@@ -114,7 +117,7 @@ export class ProjectSetupModal extends Modal {
 					button.setButtonText("选择").onClick(() => {
 						value.remoteFileId = choice.fileId;
 						fileIdInput?.setValue(choice.fileId);
-						fileIdSetting.descEl.setText(`已选择：${choice.title} (${choice.fileId})`);
+						fileIdSetting.descEl.setText("已选中：" + choice.title + "（" + choice.fileId + "）");
 					}),
 				);
 			}
@@ -125,6 +128,3 @@ export class ProjectSetupModal extends Modal {
 	}
 }
 
-function awaitable<T>(callback: () => Promise<T>): Promise<T> {
-	return callback();
-}

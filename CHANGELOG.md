@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-09-11
+
+### Changed
+
+- Reword every menu entry, dialog, status label and setting so it says what will happen and what to do next; plugin menu items now sit in their own menu section and only appear when they can run.
+- The publish check always offers a publish button: pages whose remote copy changed since the last publish are listed with an "overwrite these N pages" switch instead of silently disabling publishing.
+- "Stop on conflict" is now optional in practice: turning it off overwrites remotely edited pages without asking each time.
+
+### Fixed
+
+- Place content around child page cards instead of collapsing it to one block at the top: every standalone local link to a child page becomes a boundary, so text before and after a card stays on that side when the card was dragged in the Tencent UI.
+- Warn instead of silently misplacing content when two child page cards are adjacent and Tencent refuses to insert between them.
+- Never write unresolved image or attachment placeholders into the document.
+
 ## [0.1.7] - 2026-09-11
 
 ### Fixed

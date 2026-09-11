@@ -1,5 +1,7 @@
 const ASSET_PREFIX = "\u0000TD_ASSET_";
 const ASSET_SUFFIX = "\u0000";
+const PAGE_PREFIX = "\u0000TD_PAGE_";
+const PAGE_SUFFIX = "\u0000";
 
 export type AssetKind = "image" | "pdf";
 
@@ -14,16 +16,33 @@ export interface MarkdownAsset {
 export interface MarkdownConversion {
 	mdx: string;
 	assets: MarkdownAsset[];
+	pageLinks: MarkdownPageLink[];
 	warnings: string[];
+}
+
+/** 正文里指向某个子页面的链接，用来决定这段正文该放在哪张子页面卡片附近。 */
+export interface MarkdownPageLink {
+	index: number;
+	resolvedPath: string;
+	label: string;
+}
+
+export interface MdxSegment {
+	link: MarkdownPageLink | null;
+	text: string;
 }
 
 export interface MarkdownConversionOptions {
 	resolvePath: (target: string) => string | null;
 	embeddedMarkdownAsPage?: boolean;
+	/** 已绑定为子页面的本地 Markdown 路径；出现在正文里时会被标记位置。 */
+	childPagePaths?: readonly string[];
 }
 
 export function convertMarkdownToMdx(markdown: string, options: MarkdownConversionOptions): MarkdownConversion {
 	const assets: MarkdownAsset[] = [];
+	const pageLinks: MarkdownPageLink[] = [];
+	const childPagePaths = new Set(options.childPagePaths ?? []);
 	const warnings: string[] = [];
 	let text = stripFrontmatter(markdown.replace(/\r\n?/g, "\n")).replace(/%%[\s\S]*?%%/g, "");
 
@@ -47,6 +66,15 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 		return `${ASSET_PREFIX}${index}${ASSET_SUFFIX}`;
 	};
 
+	const addPageLink = (target: string, label: string): string | null => {
+		if (!childPagePaths.size) return null;
+		const resolved = options.resolvePath(target.split("#")[0] ?? target);
+		if (!resolved || !childPagePaths.has(resolved)) return null;
+		const index = pageLinks.length;
+		pageLinks.push({ index, resolvedPath: resolved, label });
+		return `${PAGE_PREFIX}${index}${PAGE_SUFFIX}`;
+	};
+
 	text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_whole, alt: string, target: string) => {
 		if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return _whole;
 		if (!isImage(target)) return _whole;
@@ -60,14 +88,16 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 			if (!options.embeddedMarkdownAsPage) warnings.push(`Markdown 嵌入“${target}”无法展开，已按文字占位。`);
 			return `[内嵌：${alias ?? fileLabel(target)}]`;
 		}
-		return alias ?? fileLabel(target.split("#")[0] ?? target);
+		const label = alias ?? fileLabel(target.split("#")[0] ?? target);
+		return addPageLink(target, label) ?? label;
 	});
 	text = text.replace(/\[([^\]]+)\]\(([^)]+\.pdf(?:#[^)]+)?)\)/gi, (_whole, label: string, target: string) =>
 		/^[a-z][a-z0-9+.-]*:/i.test(target) ? _whole : addAsset("pdf", target, label),
 	);
 	text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (whole: string, label: string, target: string) => {
 		if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return whole;
-		return options.resolvePath(target)?.toLowerCase().endsWith(".md") ? label : whole;
+		if (!options.resolvePath(target)?.toLowerCase().endsWith(".md")) return whole;
+		return addPageLink(target, label) ?? label;
 	});
 
 	// Raw HTML/MDX from the source is never executed. Components generated above are restored afterward.
@@ -95,7 +125,35 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 		warnings.push("存在没有配对的 $$ 公式分隔符，已按原文写入，腾讯文档可能显示为普通文本。");
 	}
 
-	return { mdx: text.trim(), assets, warnings };
+	return { mdx: text.trim(), assets, pageLinks, warnings };
+}
+
+/**
+ * 按子页面标记切分 MDX。标记必须独占一行才切分：表格、列表、段落里顺带提到的子页面链接
+ * 不参与切分，避免把一个表格或列表拆成两半。
+ */
+export function splitPageLinkSegments(mdx: string, pageLinks: MarkdownPageLink[]): MdxSegment[] {
+	if (!pageLinks.length) return [{ link: null, text: mdx }];
+	const pattern = new RegExp(`${PAGE_PREFIX}(\\d+)${PAGE_SUFFIX}`, "g");
+	const segments: MdxSegment[] = [];
+	let current: MdxSegment = { link: null, text: "" };
+	let cursor = 0;
+	let match: RegExpExecArray | null;
+	while ((match = pattern.exec(mdx)) !== null) {
+		const link = pageLinks[Number(match[1])];
+		const lineStart = mdx.lastIndexOf("\n", match.index - 1) + 1;
+		const found = mdx.indexOf("\n", match.index);
+		const lineEnd = found < 0 ? mdx.length : found;
+		const lineWithoutMarker = mdx.slice(lineStart, match.index) + mdx.slice(pattern.lastIndex, lineEnd);
+		if (!link || !/^\s*$/.test(lineWithoutMarker)) continue;
+		current.text += mdx.slice(cursor, lineStart);
+		segments.push(current);
+		current = { link, text: "" };
+		cursor = found < 0 ? lineEnd : lineEnd + 1;
+	}
+	current.text += mdx.slice(cursor);
+	segments.push(current);
+	return segments;
 }
 
 export function applyResolvedAssets(

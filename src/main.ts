@@ -70,7 +70,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	async testConnection(): Promise<void> {
 		const token = this.tokenStore.get();
 		if (!token) {
-			new Notice("请先保存 Token。");
+			new Notice("请先在设置里保存 token。");
 			return;
 		}
 		try {
@@ -105,11 +105,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		}
 		const file = this.activeMarkdown();
 		if (!file) {
-			new Notice("请先打开一篇 Markdown。");
+			new Notice("请先打开一篇 Markdown 笔记。");
 			return;
 		}
 		if (!this.tokenStore.hasToken() || !this.data.verifiedAccountId) {
-			new Notice("请先在设置中保存 Token 并测试连接。");
+			new Notice("请先在设置里保存 token 并点一次「测试连接」。");
 			return;
 		}
 		this.openProjectSetup(file);
@@ -131,11 +131,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	async removeProject(projectId: string): Promise<void> {
-		if (!window.confirm("只移除此 Vault 中的发布项目？腾讯文档不会被删除。")) return;
+		if (!window.confirm("只移除本地的发布项目？腾讯文档不会被删除。")) return;
 		this.data.projects = this.data.projects.filter((project) => project.id !== projectId);
 		delete this.data.remoteTreeCaches[projectId];
 		await this.savePluginData();
-		new Notice("仅已移除本地发布项目；腾讯文档未被修改。");
+		new Notice("已移除本地发布项目，腾讯文档没有改动。");
 	}
 
 	private registerCommands(): void {
@@ -190,18 +190,26 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on("file-menu", (menu: Menu, file) => {
 				if (file instanceof TFile && file.extension === "md") {
-					this.addMenuItem(menu, "发布当前页面", "cloud-upload", () => this.publishFile(file));
-					this.addMenuItem(menu, "预览当前页面", "scan-eye", () => this.previewFile(file));
-					this.addMenuItem(menu, "设为总览并创建发布项目…", "folder-tree", () => this.openProjectSetup(file));
-					this.addMenuItem(menu, "管理页面绑定…", "link", () => this.openBindingManager(this.projectForPath(file.path)?.id));
-					this.addMenuItem(menu, "在腾讯文档中打开", "external-link", () => this.openRemoteForFile(file));
+					const project = this.projectForPath(file.path);
+					const bound = Boolean(project?.pageMap[file.path]);
+					if (bound) {
+						this.addMenuItem(menu, "腾讯文档：检查并发布这篇笔记", "cloud-upload", () => this.publishFile(file));
+						this.addMenuItem(menu, "腾讯文档：只看这篇笔记的变化", "scan-eye", () => this.previewFile(file));
+						if (project) this.addMenuItem(menu, "腾讯文档：检查并发布整个文档树", "folder-tree", () => this.publishProject(project.id));
+					} else {
+						this.addMenuItem(menu, "腾讯文档：用这篇笔记新建发布项目…", "folder-tree", () => this.openProjectSetup(file));
+					}
+					if (project) {
+						this.addMenuItem(menu, "腾讯文档：页面绑定…", "link", () => this.openBindingManager(project.id));
+						this.addMenuItem(menu, "腾讯文档：在腾讯文档中打开", "external-link", () => this.openRemoteForFile(file));
+					}
 				} else if (file instanceof TFolder) {
 					const project = this.data.projects.find((item) => item.allowedRootPath === file.path);
-					this.addMenuItem(menu, "从此文件夹创建发布项目…", "folder-tree", () => this.createProjectFromFolder(file));
+					this.addMenuItem(menu, "腾讯文档：用这个文件夹新建发布项目…", "folder-tree", () => this.createProjectFromFolder(file));
 					if (project) {
-						this.addMenuItem(menu, "发布此文件夹的总览树", "cloud-upload", () => this.publishProject(project.id));
-						this.addMenuItem(menu, "预览此文件夹的总览树", "scan-eye", () => this.previewProject(project.id));
-						this.addMenuItem(menu, "刷新远端页面树", "refresh-cw", () => this.openBindingManager(project.id));
+						this.addMenuItem(menu, "腾讯文档：检查并发布这个项目", "cloud-upload", () => this.publishProject(project.id));
+						this.addMenuItem(menu, "腾讯文档：只看这个项目的变化", "scan-eye", () => this.previewProject(project.id));
+						this.addMenuItem(menu, "腾讯文档：刷新远端页面树与绑定", "refresh-cw", () => this.openBindingManager(project.id));
 					}
 				}
 			}),
@@ -210,14 +218,15 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			this.app.workspace.on("editor-menu", (menu: Menu) => {
 				const file = this.activeMarkdown();
 				if (!file) return;
-				this.addMenuItem(menu, "发布当前页面", "cloud-upload", () => this.publishFile(file));
-				this.addMenuItem(menu, "预览当前页面", "scan-eye", () => this.previewFile(file));
+				if (!this.projectForPath(file.path)?.pageMap[file.path]) return;
+				this.addMenuItem(menu, "腾讯文档：检查并发布这篇笔记", "cloud-upload", () => this.publishFile(file));
+				this.addMenuItem(menu, "腾讯文档：只看这篇笔记的变化", "scan-eye", () => this.previewFile(file));
 			}),
 		);
 	}
 
 	private addMenuItem(menu: Menu, title: string, icon: string, action: () => void): void {
-		menu.addItem((item: MenuItem) => item.setTitle(title).setIcon(icon).onClick(action));
+		menu.addItem((item: MenuItem) => item.setTitle(title).setIcon(icon).setSection("tencent-docs").onClick(action));
 	}
 
 	private checkBoundMarkdown(checking: boolean, action: () => void, requireRemote = true): boolean {
@@ -305,16 +314,16 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	private openRemoteForFile(file: TFile): void {
 		const project = this.projectForPath(file.path);
 		if (!project) {
-			new Notice("当前页面尚未绑定腾讯文档。");
+			new Notice("这篇笔记还没有绑定腾讯页面，请先用「页面绑定」完成绑定。");
 			return;
 		}
 		if (!project.remoteUrl) {
-			new Notice("该项目尚未保存可打开的腾讯文档 URL，请先刷新远端页面树。");
+			new Notice("这个项目还没有记录腾讯文档地址，请先执行一次「刷新远端页面树与绑定」。");
 			return;
 		}
 		window.open(project.remoteUrl);
 		const title = project.pageMap[file.path]?.remoteTitle;
-		if (title) new Notice(`已打开所属文档；目标子页面：${title}`);
+		if (title) new Notice(`已在腾讯文档中打开；这篇笔记对应的是子页面「${title}」。`);
 	}
 
 	private createClient(): TencentMcpClient {
@@ -361,7 +370,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 
 	private openProjectSetup(file: TFile): void {
 		if (!this.tokenStore.hasToken() || !this.data.verifiedAccountId) {
-			new Notice("请先在设置中保存 Token 并测试连接。");
+			new Notice("请先在设置里保存 token 并点一次「测试连接」。");
 			return;
 		}
 		new ProjectSetupModal(
@@ -424,11 +433,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			new BindingModal(this.app, result.proposals, result.cache.nodes, async (selections) => {
 				project.pageMap = bindingsFromSelections(result.proposals, selections, result.cache.nodes, project.pageMap);
 				await this.savePluginData();
-				new Notice("页面绑定已保存；尚未开始发布。");
+				new Notice("绑定已保存，还没有发布。");
 			}).open();
 			await this.savePluginData();
 		} catch (error) {
-			new Notice(error instanceof Error ? error.message : "刷新远端页面树失败。");
+			new Notice(error instanceof Error ? error.message : "无法刷新远端页面树。");
 			throw error;
 		}
 	}
@@ -436,11 +445,11 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	private async showPagePreview(file: TFile, mode: "quick" | "refreshed", allowPublish: boolean): Promise<void> {
 		const project = this.projectForPath(file.path);
 		if (!project) {
-			new Notice("当前页面尚未加入发布项目。");
+			new Notice("这篇笔记还没有发布项目。请先在文件上右键选择「用这篇笔记新建发布项目」。");
 			return;
 		}
 		if (mode === "refreshed" && !this.canUseRemote(project)) {
-			new Notice("请先测试当前 Token，并确认它可以访问该项目的腾讯文档。");
+			new Notice("需要先确认 token 可用：请在设置里点一次「测试连接」。");
 			return;
 		}
 		try {
@@ -455,7 +464,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				this.data.remoteTreeCaches[project.id],
 				project.embeddedMarkdownAsPage ?? this.data.defaults.embeddedMarkdownAsPage,
 			);
-			new PreviewModal(this.app, [preview], mode, allowPublish ? async (allowConflict) => {
+			new PreviewModal(this.app, [preview], mode, allowPublish ? async (requested) => {
 				const startedAt = new Date().toISOString();
 				const publishClient = this.createClient();
 				try {
@@ -466,10 +475,12 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 						uploadBinary,
 					).resolve(preview.assets);
 					const mdx = applyResolvedAssets(preview.conversion, assets.urls);
-					await publishPreparedPage(publishClient, project, preview, mdx, allowConflict);
+					const allowConflict = requested.length > 0 || !this.data.defaults.stopOnConflict;
+					const published = await publishPreparedPage(publishClient, project, preview, mdx, allowConflict);
 					this.recordTask(project.id, startedAt, "completed", 1, 1, "verified");
 					await this.savePluginData();
-					new Notice(`发布并验证完成：${file.basename}`);
+					const extra = published.warnings.length ? `注意：${published.warnings.join(" ")}` : "";
+					new Notice(`已发布并回读校验：${file.basename}。${extra}`);
 				} catch (error) {
 					this.recordTask(
 						project.id, startedAt,
@@ -482,7 +493,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				}
 			} : undefined).open();
 		} catch (error) {
-			new Notice(error instanceof Error ? error.message : "预览失败。");
+			new Notice(error instanceof Error ? error.message : "无法生成预览。");
 		}
 	}
 
@@ -492,7 +503,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		allowPublish: boolean,
 	): Promise<void> {
 		if (mode === "refreshed" && !this.canUseRemote(project)) {
-			new Notice("请先测试当前 Token，并确认它可以访问该项目的腾讯文档。");
+			new Notice("需要先确认 token 可用：请在设置里点一次「测试连接」。");
 			return;
 		}
 		try {
@@ -522,13 +533,17 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				};
 			}
 			const summary = mode === "refreshed"
-				? `预计至少读取 ${prepared.budget.pageReadsAtLeast} 次、写入 ${prepared.budget.pageWritesAtLeast} 页；上传 ${prepared.budget.uniqueImages} 张去重图片，导入 ${prepared.budget.changedPdfs} 个 PDF。`
-				: undefined;
-			new PreviewModal(this.app, prepared.pages, mode, allowPublish ? async () => {
+				? this.summarizePreflight(prepared)
+				: "离线预览：只生成内容，不读取腾讯文档。";
+			new PreviewModal(this.app, prepared.pages, mode, allowPublish ? async (requested) => {
 				const progress = new ProgressModal(this.app);
 				progress.open();
 				const startedAt = new Date().toISOString();
 				try {
+					const allowConflicts = new Set(requested);
+					if (!this.data.defaults.stopOnConflict) {
+						for (const page of prepared.pages) if (page.status === "conflict") allowConflicts.add(page.localPath);
+					}
 					const result = await executeProjectPublish(
 					prepared,
 					reader,
@@ -539,12 +554,19 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 						signal: progress.controller.signal,
 						saveState: () => this.savePluginData(),
 						onProgress: (state) => progress.update(state),
+						allowConflicts,
 					},
 				);
 					this.recordTask(project.id, startedAt, result.cancelled ? "cancelled" : "completed", result.published.length, prepared.pages.length, result.cancelled ? "cancelled" : "verified");
 					await this.savePluginData();
 					const reasons = [...new Set(Object.values(result.skipReasons))];
-					const message = `发布完成 ${result.published.length} 页，跳过 ${result.skipped.length} 页。${reasons.join(" ")}${result.permissions.length ? "公开权限已请求，请用未登录窗口抽查。" : ""}`;
+					const notices = [...new Set(Object.values(result.pageWarnings).flat())];
+					const message = [
+						`发布完成：已更新 ${result.published.length} 页，跳过 ${result.skipped.length} 页。`,
+						...reasons,
+						...notices,
+						result.permissions.length ? "已请求公开只读权限，建议用未登录窗口抽查一次。" : "",
+					].filter(Boolean).join(" ");
 					progress.complete(message);
 					new Notice(message);
 				} catch (error) {
@@ -563,8 +585,23 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				}
 			} : undefined, summary).open();
 		} catch (error) {
-			new Notice(error instanceof Error ? error.message : "总览树预览失败。");
+			new Notice(error instanceof Error ? error.message : "无法生成发布预览。");
 		}
+	}
+
+	/** 把预检预算翻译成一句人话，说明这次发布会做什么。 */
+	private summarizePreflight(prepared: ProjectPreflight): string {
+		const pending = prepared.pages.filter((page) => page.status === "changed").length;
+		const conflicts = prepared.pages.filter((page) => page.status === "conflict").length;
+		const bound = prepared.pages.length - prepared.pages.filter((page) => page.status === "unbound").length;
+		const parts: string[] = [];
+		if (prepared.budget.pageWritesAtLeast > 0) parts.push(`将更新 ${prepared.budget.pageWritesAtLeast} 个页面`);
+		else parts.push("没有需要更新的页面");
+		if (prepared.budget.uniqueImages > 0) parts.push(`上传 ${prepared.budget.uniqueImages} 张图片`);
+		if (prepared.budget.changedPdfs > 0) parts.push(`导入 ${prepared.budget.changedPdfs} 个 PDF`);
+		if (conflicts > 0) parts.push(`${conflicts} 个页面需要确认覆盖`);
+		parts.push(`共读取 ${prepared.budget.pageReadsAtLeast} 次远端内容（${pending}/${bound} 页有本地改动）`);
+		return parts.join("；") + "。";
 	}
 
 	private recordTask(

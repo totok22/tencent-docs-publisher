@@ -213,6 +213,65 @@ describe("single page publishing", () => {
 		expect(operations).toEqual([]);
 	});
 
+
+	it("keeps content on both sides of a child Page card", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="root"><Paragraph id="old-a">old a</Paragraph><Page id="child" title="Child" /><Paragraph id="old-b">old b</Paragraph></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "前一段正文\n\n[[child.md]]\n\n后一段正文"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target === "child.md" ? "child.md" : null; },
+		};
+		project.pageMap["child.md"] = { pageId: "child", parentPageId: "root", localTitle: "Child", remoteTitle: "Child" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(operations).toEqual([
+			{ file_id: "file", action: "INSERT_BEFORE", id: "old-a", content: "前一段正文" },
+			{ file_id: "file", action: "INSERT_BEFORE", id: "old-b", content: "后一段正文" },
+			{ file_id: "file", action: "DELETE", id: "old-a" },
+			{ file_id: "file", action: "DELETE", id: "old-b" },
+		]);
+		expect(result.warnings).toEqual([]);
+	});
+
+	it("reports adjacent child Page cards instead of silently placing content past them", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="root"><Page id="child" title="Child" /><Page id="other" title="Other" /><Paragraph id="old">old</Paragraph></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "[[child.md]]\n\n中间的正文\n\n[[other.md]]\n\n结尾正文"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target.endsWith(".md") ? target : null; },
+		};
+		project.pageMap["child.md"] = { pageId: "child", parentPageId: "root", localTitle: "Child", remoteTitle: "Child" };
+		project.pageMap["other.md"] = { pageId: "other", parentPageId: "root", localTitle: "Other", remoteTitle: "Other" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(operations).toEqual([
+			{ file_id: "file", action: "INSERT_BEFORE", id: "old", content: "中间的正文" },
+			{ file_id: "file", action: "INSERT_BEFORE", id: "old", content: "结尾正文" },
+			{ file_id: "file", action: "DELETE", id: "old" },
+		]);
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toContain("连在一起");
+		expect(result.warnings[0]).toContain("拖到正文该在的位置");
+	});
+
 	it("deletes only ordinary blocks and verifies that child Page order is retained", async () => {
 		const project = fixtureProject();
 		let remote = '<Page id="root"><Paragraph id="old">old</Paragraph><Page id="child" title="Child" /><Readonly id="locked" readonly="true">keep</Readonly><Custom id="unknown">keep</Custom></Page>';
