@@ -12,6 +12,26 @@ export interface PublishPageResult {
 	preservedBlocks: number;
 }
 
+/**
+ * smartcanvas.edit 没有页面参数：正文只会落进“锚点 Block 所属的页面”。
+ *
+ * 实测（2026-09-11）：
+ * - 用子页面内部的普通块当锚点，INSERT_BEFORE 会准确写进该子页面；
+ * - 用 <Page> 块当锚点会被拒绝（cannot insert content at page block）；
+ * - 传 page_id 会被忽略，不带锚点的 INSERT_AFTER 追加到文档末尾，也就是根页面。
+ *
+ * 因此子页面必须有自己的普通块才能写入；否则返回需要用户先补一个占位段落的说明。
+ */
+export function describeUnwritablePage(project: PublishProject, preflight: PagePreflight): string | null {
+	const binding = project.pageMap[preflight.localPath];
+	if (!binding || !preflight.parsedRemote) return null;
+	if (binding.pageId === project.remoteRootPageId) return null;
+	if (!preflight.conversion.mdx.trim()) return null;
+	const hasOwnBlock = preflight.parsedRemote.blocks.some((block) => block.id && !block.preserve);
+	if (hasOwnBlock) return null;
+	return `子页面“${binding.remoteTitle || binding.localTitle}”在腾讯文档里还没有正文，接口找不到可以定位的插入点。请先在该子页面里输入任意一个字符作为占位，发布后插件会自动删掉它。`;
+}
+
 export async function publishPreparedPage(
 	client: ToolJsonCaller,
 	project: PublishProject,
@@ -32,6 +52,8 @@ export async function publishPreparedPage(
 	const before = preflight.parsedRemote;
 	const writable = before.blocks.filter((block) => !block.preserve);
 	if (writable.some((block) => !block.id)) throw new Error("远端普通内容块缺少 Block ID，无法安全替换。");
+	const unwritable = describeUnwritablePage(project, preflight);
+	if (unwritable) throw new PublisherError(unwritable, "EMPTY_SUB_PAGE", "insert-page-content");
 	const anchor = writable.find((block) => block.id)?.id ?? null;
 	const expectedChildIds = before.directChildPages.map((page) => page.pageId);
 	let mutated = false;

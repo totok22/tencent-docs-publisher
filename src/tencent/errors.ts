@@ -6,6 +6,7 @@ export type PublisherErrorCode =
 	| "NETWORK"
 	| "PROTOCOL"
 	| "REMOTE"
+	| "EMPTY_SUB_PAGE"
 	| "AMBIGUOUS_WRITE";
 
 export class PublisherError extends Error {

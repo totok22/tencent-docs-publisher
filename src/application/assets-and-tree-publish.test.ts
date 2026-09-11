@@ -108,6 +108,28 @@ describe("project publishing", () => {
 		expect(result.published).toEqual(["grand.md"]);
 		expect(result.skipped.sort()).toEqual(["child.md", "root.md"]);
 	});
+
+	it("skips sub pages that have no anchor block and keeps publishing the rest", async () => {
+		const fixture = await projectFixture();
+		const pageIdByPath: Record<string, string> = { "root.md": "root", "child.md": "child", "grand.md": "grand" };
+		fixture.contents.grand = '---\ntitle: Grand\n---\n';
+		for (const page of fixture.preflight.pages) {
+			const pageId = pageIdByPath[page.localPath] ?? "";
+			page.remoteContent = fixture.contents[pageId] ?? "";
+			page.parsedRemote = parseRemoteMdx(page.remoteContent, pageId);
+		}
+		const result = await executeProjectPublish(
+			fixture.preflight,
+			binaryReader({}),
+			fixture.client,
+			fixture.data,
+			async () => undefined,
+		);
+		expect(result.published).toEqual(["child.md", "root.md"]);
+		expect(result.skipped).toEqual(["grand.md"]);
+		expect(Object.values(result.skipReasons)[0]).toContain("还没有正文");
+		expect(fixture.insertOrder).toEqual(["child-old", "root-old"]);
+	});
 });
 
 async function projectFixture() {
@@ -147,7 +169,7 @@ async function projectFixture() {
 		project, localTree, pages, blockers: [],
 		budget: { pageReadsAtLeast: 6, pageWritesAtLeast: 3, uniqueImages: 0, changedPdfs: 0 },
 	};
-	return { project, preflight, client, insertOrder, data: structuredClone(DEFAULT_DATA) };
+	return { project, preflight, client, insertOrder, contents, data: structuredClone(DEFAULT_DATA) };
 }
 
 function projectValue(): PublishProject {

@@ -543,7 +543,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 				);
 					this.recordTask(project.id, startedAt, result.cancelled ? "cancelled" : "completed", result.published.length, prepared.pages.length, result.cancelled ? "cancelled" : "verified");
 					await this.savePluginData();
-					const message = `发布完成 ${result.published.length} 页，跳过 ${result.skipped.length} 页。${result.permissions.length ? "公开权限已请求，请用未登录窗口抽查。" : ""}`;
+					const reasons = [...new Set(Object.values(result.skipReasons))];
+					const message = `发布完成 ${result.published.length} 页，跳过 ${result.skipped.length} 页。${reasons.join(" ")}${result.permissions.length ? "公开权限已请求，请用未登录窗口抽查。" : ""}`;
 					progress.complete(message);
 					new Notice(message);
 				} catch (error) {

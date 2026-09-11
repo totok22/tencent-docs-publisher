@@ -11,7 +11,9 @@ describe("Markdown conversion", () => {
 		const conversion = convertMarkdownToMdx(markdown, { resolvePath: (target) => `assets/${target}` });
 		expect(conversion.mdx).toContain('<Callout type="note" title="Tip">body</Callout>');
 		expect(conversion.mdx).toContain("<Table>");
-		expect(conversion.mdx).toContain("$$R_{\\text{test}} = \\text{max}$$");
+		expect(conversion.mdx).toContain("<MathBlock>");
+		expect(conversion.mdx).toContain("<MathBlock>\n$$\nR_{\\text{test}} = \\text{max}\n$$\n</MathBlock>");
+		expect(conversion.mdx).not.toContain("$$$");
 		expect(conversion.mdx).toContain('<Mark backgroundColor="yellow">mark</Mark>');
 		expect(conversion.mdx).not.toContain("title: Hidden");
 		expect(conversion.mdx).not.toContain("hidden");
@@ -43,6 +45,28 @@ describe("Markdown conversion", () => {
 			"禁止 MDX 表达式。",
 			"未知 MDX 组件：Evil",
 		]);
+	});
+
+	it("drops empty headings that Tencent would render as placeholder titles", () => {
+		const conversion = convertMarkdownToMdx("# 保持\n\n### \n\n正文\n\n```\n###\n```", { resolvePath: () => null });
+		expect(conversion.mdx).toContain("# 保持");
+		expect(conversion.mdx).toContain("正文");
+		expect(conversion.mdx).toContain("```\n###\n```");
+		expect(conversion.warnings.some((warning) => warning.includes("空标题"))).toBe(true);
+	});
+
+	it("converts block math outside code and reports unpaired delimiters", () => {
+		const conversion = convertMarkdownToMdx("$$a+b$$", { resolvePath: () => null });
+		expect(conversion.mdx).toBe("<MathBlock>\n$$\na+b\n$$\n</MathBlock>");
+		expect(conversion.warnings).toEqual([]);
+
+		const inCode = convertMarkdownToMdx("```\n$$a+b$$\n```", { resolvePath: () => null });
+		expect(inCode.mdx).toBe("```\n$$a+b$$\n```");
+		expect(inCode.warnings).toEqual([]);
+
+		const unpaired = convertMarkdownToMdx("公式缺失闭合 $$a+b", { resolvePath: () => null });
+		expect(unpaired.mdx).toBe("公式缺失闭合 $$a+b");
+		expect(unpaired.warnings.some((warning) => warning.includes("没有配对"))).toBe(true);
 	});
 });
 
@@ -121,7 +145,7 @@ describe("single page publishing", () => {
 	it.each([
 		["a page containing only a child Page", '<Page id="child">Child</Page>', ["child"]],
 		["a completely empty page", "---\ntitle: Empty\n---\n", []],
-	])("appends without a Page anchor for %s", async (_case, initialRemote, expectedChildren) => {
+	])("appends to the document root without a Page anchor for %s", async (_case, initialRemote, expectedChildren) => {
 		const project = fixtureProject();
 		let remote = initialRemote;
 		const operations: Array<Record<string, unknown>> = [];
@@ -139,6 +163,54 @@ describe("single page publishing", () => {
 		await publishPreparedPage(client, project, preflight, "new");
 		expect(operations).toEqual([{ file_id: "file", action: "INSERT_AFTER", content: "new" }]);
 		expect(parseRemoteMdx(remote, "root").directChildPages.map((page) => page.pageId)).toEqual(expectedChildren);
+	});
+
+	it("writes into a sub page by anchoring on an ordinary block inside that page", async () => {
+		const project = fixtureProject();
+		let remote = '<Page id="child"><Paragraph id="child-old">old</Paragraph><Page id="grand" title="Grand" /></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				if (args?.action === "INSERT_BEFORE" && args.id === "child-old") {
+					remote = remote.replace('<Paragraph id="child-old">', '<Paragraph id="new">new</Paragraph><Paragraph id="child-old">');
+				}
+				if (args?.action === "DELETE" && args.id === "child-old") {
+					remote = remote.replace(/<Paragraph id="child-old">[\s\S]*?<\/Paragraph>/, "");
+				}
+				return {} as T;
+			},
+		};
+		project.pageMap["index.md"] = { pageId: "child", parentPageId: "root", localTitle: "Index", remoteTitle: "Child" };
+		const preflight = await preflightPage(fixtureReader("new"), project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, "new");
+		expect(operations).toEqual([
+			{ file_id: "file", action: "INSERT_BEFORE", id: "child-old", content: "new" },
+			{ file_id: "file", action: "DELETE", id: "child-old" },
+		]);
+		expect(remote).toContain('<Page id="grand" title="Grand" />');
+		expect(result.deletedBlocks).toBe(1);
+	});
+
+	it("refuses an empty sub page instead of letting the write fall through to the document root", async () => {
+		const project = fixtureProject();
+		const remote = "---\ntitle: Child\n---\n";
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		project.pageMap["index.md"] = { pageId: "child", parentPageId: "root", localTitle: "Index", remoteTitle: "Child" };
+		const preflight = await preflightPage(fixtureReader("new"), project, "index.md", "refreshed", client);
+		expect(preflight.warnings.some((warning) => warning.includes("还没有正文"))).toBe(true);
+		await expect(publishPreparedPage(client, project, preflight, "new")).rejects.toMatchObject({
+			code: "EMPTY_SUB_PAGE",
+		});
+		expect(operations).toEqual([]);
 	});
 
 	it("deletes only ordinary blocks and verifies that child Page order is retained", async () => {

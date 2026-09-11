@@ -5,7 +5,7 @@ import { PublishAssetResolver } from "../tencent/assets";
 import type { ToolJsonCaller } from "../tencent/smartcanvas";
 import type { PublishProject, TencentDocsPublisherData } from "../types";
 import { preflightPage, type PagePreflight, type PreflightVaultReader } from "./preflight";
-import { publishPreparedPage } from "./publish-page";
+import { describeUnwritablePage, publishPreparedPage } from "./publish-page";
 import { refreshBindings } from "./refresh-bindings";
 
 export interface RequestBudget {
@@ -33,6 +33,7 @@ export interface PublishProgress {
 export interface ProjectPublishResult {
 	published: string[];
 	skipped: string[];
+	skipReasons: Record<string, string>;
 	permissions: PermissionRequestResult[];
 	cancelled: boolean;
 }
@@ -61,7 +62,10 @@ export async function prepareProjectPreflight(
 		.map((page) => `${page.localPath}：${page.status === "conflict" ? "远端内容冲突" : page.errors.join("；") || "页面未绑定"}`);
 	blockers.push(...refreshed.proposals.filter((proposal) => proposal.status === "hierarchy-changed").map((proposal) => `${proposal.localPath}：远端层级已变更，需要重新确认绑定`));
 	blockers.push(...localTree.diagnostics.filter((diagnostic) => diagnostic.kind === "max-depth" || diagnostic.kind === "max-notes").map((diagnostic) => `${diagnostic.parentPath}：${diagnostic.message}`));
-	const changed = pages.filter((page) => page.status === "changed" || (!data.defaults.skipUnchanged && page.status === "unchanged"));
+	const changed = pages.filter((page) =>
+		!describeUnwritablePage(project, page) &&
+		(page.status === "changed" || (!data.defaults.skipUnchanged && page.status === "unchanged")),
+	);
 	const uniqueImages = new Set(changed.flatMap((page) => page.assets.filter((asset) => asset.kind === "image").map((asset) => asset.contentHash))).size;
 	const changedPdfs = changed.flatMap((page) => page.assets.filter((asset) => asset.kind === "pdf")).filter((asset) => {
 		const cached = asset.resolvedPath ? data.importedPdfs[asset.resolvedPath] : undefined;
@@ -105,11 +109,18 @@ export async function executeProjectPublish(
 	const published: string[] = [];
 	let skipped: string[] = [];
 	let permissions: PermissionRequestResult[] = [];
+	const skipReasons: Record<string, string> = {};
 	try {
+		for (const page of preflight.pages) {
+			const reason = describeUnwritablePage(project, page);
+			if (reason) skipReasons[page.localPath] = reason;
+		}
 		const changed = preflight.pages.filter((page) =>
-			page.status === "changed" ||
-			(!data.defaults.skipUnchanged && page.status === "unchanged") ||
-			options.allowConflicts?.has(page.localPath),
+			!skipReasons[page.localPath] && (
+				page.status === "changed" ||
+				(!data.defaults.skipUnchanged && page.status === "unchanged") ||
+				options.allowConflicts?.has(page.localPath)
+			),
 		);
 		const resolver = new PublishAssetResolver(client, reader, data.importedPdfs, upload);
 		const rendered = new Map<string, { page: PagePreflight; mdx: string; pdfIds: string[] }>();
@@ -148,11 +159,11 @@ export async function executeProjectPublish(
 		}
 		await options.saveState?.();
 		skipped = preflight.pages.filter((page) => !rendered.has(page.localPath)).map((page) => page.localPath);
-		return { published, skipped, permissions, cancelled: false };
+		return { published, skipped, skipReasons, permissions, cancelled: false };
 	} catch (error) {
 		if (options.signal?.aborted) {
 			skipped = preflight.pages.filter((page) => !published.includes(page.localPath)).map((page) => page.localPath);
-			return { published, skipped, permissions, cancelled: true };
+			return { published, skipped, skipReasons, permissions, cancelled: true };
 		}
 		throw error;
 	} finally {

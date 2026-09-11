@@ -38,6 +38,7 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 		`<Todo${checked.toLowerCase() === "x" ? " checked" : ""}>${body}</Todo>`,
 	);
 	text = text.replace(/==([^=\n]+)==/g, '<Mark backgroundColor="yellow">$1</Mark>');
+	text = stripEmptyHeadings(text, warnings);
 
 	const addAsset = (kind: AssetKind, target: string, label: string): string => {
 		const cleanTarget = target.split("#")[0] ?? target;
@@ -83,6 +84,16 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 	text = transformOutsideMarkdownLiterals(text, (plainText) =>
 		plainText.replace(/\{/g, "&#123;").replace(/\}/g, "&#125;"),
 	);
+	// 块级公式改为 MathBlock 组件：腾讯文档对 $$...$$ 的解析不稳定，会出现随机 id 混入公式的情况。
+	text = transformOutsideCode(text, (segment) =>
+		segment.replace(/\$\$([^$]+)\$\$/g, (_whole, math: string) =>
+			`<MathBlock>\n$$\n${math.trim()}\n$$\n</MathBlock>`,
+		),
+	);
+	const outsideCode = transformOutsideCode(text, (segment) => segment);
+	if (((outsideCode.match(/\$\$/g) ?? []).length % 2) === 1) {
+		warnings.push("存在没有配对的 $$ 公式分隔符，已按原文写入，腾讯文档可能显示为普通文本。");
+	}
 
 	return { mdx: text.trim(), assets, warnings };
 }
@@ -142,6 +153,44 @@ function stripFrontmatter(markdown: string): string {
 	if (!markdown.startsWith("---\n")) return markdown;
 	const end = markdown.indexOf("\n---", 4);
 	return end >= 0 ? markdown.slice(end + 4).replace(/^\n/, "") : markdown;
+}
+
+/** 只在代码块与行内代码之外应用转换，避免改写 `` `$$x$$` `` 这类代码示例。 */
+function transformOutsideCode(text: string, transform: (plainText: string) => string): string {
+	const codePattern = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g;
+	let output = "";
+	let cursor = 0;
+	let match: RegExpExecArray | null;
+	while ((match = codePattern.exec(text)) !== null) {
+		output += transform(text.slice(cursor, match.index));
+		output += match[0];
+		cursor = codePattern.lastIndex;
+	}
+	return output + transform(text.slice(cursor));
+}
+
+function stripEmptyHeadings(text: string, warnings: string[]): string {
+	const output: string[] = [];
+	let removed = 0;
+	let fence: string | null = null;
+	for (const line of text.split("\n")) {
+		const fenceMatch = /^\s*(```+|~~~+)/.exec(line);
+		if (fenceMatch) {
+			const marker = fenceMatch[1]?.[0] ?? "`";
+			fence = fence === null ? marker : fence === marker ? null : fence;
+			output.push(line);
+			continue;
+		}
+		if (fence === null && /^#{1,6}[ \t]*$/.test(line)) {
+			removed += 1;
+			continue;
+		}
+		output.push(line);
+	}
+	if (removed > 0) {
+		warnings.push(`已跳过 ${removed} 个空标题：腾讯文档会把空标题渲染成"标题 N"占位符，请在源文件中补全标题文字或删除该行。`);
+	}
+	return output.join("\n");
 }
 
 function replaceTables(text: string): string {
