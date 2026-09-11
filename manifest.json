@@ -3,7 +3,7 @@
   "name": "Tencent Docs Publisher",
   "version": "0.1.12",
   "minAppVersion": "1.11.4",
-  "description": "Manually publish Obsidian notes and linked note trees to existing Tencent Docs pages.",
+  "description": "Manually publish notes and linked note trees to existing Tencent Docs pages.",
   "author": "totok22",
   "authorUrl": "https://github.com/totok22",
   "isDesktopOnly": true
