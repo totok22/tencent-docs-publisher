@@ -67,10 +67,31 @@ export async function remoteContentFingerprint(content: string, expectedPageId?:
 				const id = readAttribute(block.raw, "id") ?? "missing";
 				return `<Page id="${escapeAttribute(id)}" />`;
 			}
-			return normalizeSemanticWhitespace(stripVolatileBlockId(block.raw));
+			return normalizeSemanticWhitespace(
+				stripInlineMathTokens(stripVolatilePresentation(stripVolatileBlockId(block.raw))),
+			);
 		})
 		.join("\n");
 	return sha256Hex(canonical);
+}
+
+/**
+ * 去掉腾讯在渲染时自己算出来的展示属性：编辑器打开文档后会给 Image/MathBlock 补 width、height，
+ * 并重算行内公式尾部的内部引用 id。这些都不是用户改动，不能算进内容指纹，否则一打开文档就会
+ * 被判定成“远端内容冲突”。
+ */
+function stripVolatilePresentation(raw: string): string {
+	const withoutSizes = raw.replace(/<(Image|MathBlock)\b[^>]*>/g, (tag) =>
+		tag.replace(/\s+(?:width|height)\s*=\s*\{[^{}]*\}/g, ""),
+	);
+	return withoutSizes;
+}
+
+/** 行内公式 $...$ 结尾的 ,xxxxxxxxxx 是腾讯内部的公式引用，重新渲染时会变。 */
+function stripInlineMathTokens(raw: string): string {
+	return raw.replace(/,[0-9A-Za-z]{10}(?=\$)/g, (token) =>
+		/[0-9]/.test(token) && /[A-Za-z]/.test(token) ? "" : token,
+	);
 }
 
 function stripVolatileBlockId(raw: string): string {

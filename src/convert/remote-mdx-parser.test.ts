@@ -87,6 +87,33 @@ title: 测试1
 		);
 	});
 
+
+	it("ignores presentation values that Tencent recomputes when a page is rendered", async () => {
+		const withComputed = `<Page id="root">
+<Paragraph id="p1">文字 ($E=mc^2,Ab3dEf9hIj$)</Paragraph>
+<Image src="https://img" width={419} height={92} alt="pic" id="img-1" />
+<MathBlock width={283.6159973144531} id="math-1">
+$$
+a+b
+$$
+</MathBlock>
+</Page>`;
+		const rerendered = withComputed
+			.replace("width={419}", "width={420}")
+			.replace("height={92}", "height={93}")
+			.replace("width={283.6159973144531}", "width={301.25}")
+			.replace(",Ab3dEf9hIj", ",Zz9Yx8Wv7U")
+			.replace('id="img-1"', 'id="img-2"')
+			.replace('id="math-1"', 'id="math-2"');
+		expect(await remoteContentFingerprint(rerendered, "root")).toBe(
+			await remoteContentFingerprint(withComputed, "root"),
+		);
+		const edited = withComputed.replace("a+b", "a-b");
+		expect(await remoteContentFingerprint(edited, "root")).not.toBe(
+			await remoteContentFingerprint(withComputed, "root"),
+		);
+	});
+
 	it("ignores volatile ordinary Block IDs", async () => {
 		const changedIds = CONTENT.replace('id="p1"', 'id="server-generated-new"');
 		expect(await remoteContentFingerprint(changedIds, "root")).toBe(

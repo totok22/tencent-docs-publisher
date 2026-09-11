@@ -82,7 +82,7 @@ export class ProjectView extends ItemView {
 		if (!tasks.length) container.createEl("p", { text: "还没有发布记录。" });
 		for (const task of tasks) {
 			const project = this.plugin.data.projects.find((item) => item.id === task.projectId);
-			const stage = TASK_STAGE[task.stage] ?? task.stage;
+			const stage = TASK_STAGE[task.stage] ?? `其他步骤（${task.stage}）`;
 			const parts = [
 				TASK_STATUS[task.status] + " · " + stage,
 				new Date(task.finishedAt).toLocaleString(),

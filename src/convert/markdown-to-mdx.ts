@@ -141,11 +141,17 @@ export function splitPageLinkSegments(mdx: string, pageLinks: MarkdownPageLink[]
 	let match: RegExpExecArray | null;
 	while ((match = pattern.exec(mdx)) !== null) {
 		const link = pageLinks[Number(match[1])];
+		if (!link) continue;
 		const lineStart = mdx.lastIndexOf("\n", match.index - 1) + 1;
 		const found = mdx.indexOf("\n", match.index);
 		const lineEnd = found < 0 ? mdx.length : found;
 		const lineWithoutMarker = mdx.slice(lineStart, match.index) + mdx.slice(pattern.lastIndex, lineEnd);
-		if (!link || !/^\s*$/.test(lineWithoutMarker)) continue;
+		if (!/^\s*$/.test(lineWithoutMarker)) {
+			// 行内提及：保留链接文字，不切分这一行。
+			current.text += mdx.slice(cursor, match.index) + link.label;
+			cursor = pattern.lastIndex;
+			continue;
+		}
 		current.text += mdx.slice(cursor, lineStart);
 		segments.push(current);
 		current = { link, text: "" };

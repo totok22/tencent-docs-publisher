@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-09-11
+
+### Fixed
+
+- Keep an inline mention of a child page (for example a table cell or a sentence containing the link) as plain text; it used to leave an internal marker in the body and abort the publish.
+- Ignore the presentation values Tencent recomputes on its own (computed width/height on images and math blocks, and the internal reference id inside inline formulas) when comparing remote content, so merely opening the document no longer reports every page as remotely edited.
+
 ## [0.1.8] - 2026-09-11
 
 ### Changed

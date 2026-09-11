@@ -272,6 +272,36 @@ describe("single page publishing", () => {
 		expect(result.warnings[0]).toContain("拖到正文该在的位置");
 	});
 
+
+	it("keeps an inline mention of a child page as plain text", async () => {
+		const project = fixtureProject();
+		const remote = '<Page id="root"><Paragraph id="old">old</Paragraph></Page>';
+		const operations: Array<Record<string, unknown>> = [];
+		const client = {
+			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+				if (name === "smartcanvas.read") return { content: remote } as T;
+				operations.push(args ?? {});
+				return {} as T;
+			},
+		};
+		const reader: PreflightVaultReader = {
+			async readMarkdown() { return "详见 [[child.md|子页面说明]] 与 [[child.md]]\n\n| 列 | 值 |\n| -- | -- |\n| 参考 | [[child.md]] |"; },
+			async readBinary(path) { throw new Error(path); },
+			resolvePath(target) { return target === "child.md" ? "child.md" : null; },
+		};
+		project.pageMap["child.md"] = { pageId: "child", parentPageId: "root", localTitle: "Child", remoteTitle: "Child" };
+		const preflight = await preflightPage(reader, project, "index.md", "refreshed", client);
+		const result = await publishPreparedPage(client, project, preflight, preflight.conversion.mdx);
+		expect(result.warnings).toEqual([]);
+		expect(operations).toHaveLength(2);
+		const inserted = operations[0]?.["content"] as string;
+		expect(inserted).not.toContain("\u0000");
+		expect(inserted).toContain("子页面说明");
+		expect(inserted).toContain("child");
+		expect(inserted).toContain("<Table>");
+		expect(operations[1]).toEqual({ file_id: "file", action: "DELETE", id: "old" });
+	});
+
 	it("deletes only ordinary blocks and verifies that child Page order is retained", async () => {
 		const project = fixtureProject();
 		let remote = '<Page id="root"><Paragraph id="old">old</Paragraph><Page id="child" title="Child" /><Readonly id="locked" readonly="true">keep</Readonly><Custom id="unknown">keep</Custom></Page>';
