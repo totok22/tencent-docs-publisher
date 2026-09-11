@@ -72,9 +72,10 @@ export class ProjectView extends ItemView {
 				.addButton((button) => button.setCta().setButtonText("发布").onClick(() => this.plugin.publishProject(project.id)))
 				.addExtraButton((button) => button.setIcon("refresh-cw").setTooltip("刷新远端页面树并管理绑定").onClick(() => this.plugin.openBindingManager(project.id)))
 				.addExtraButton((button) => button.setIcon("external-link").setTooltip("在腾讯文档中打开").onClick(() => this.plugin.openProjectDocument(project.id)))
-				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除项目").onClick(async () => {
-					await this.plugin.removeProject(project.id);
-					this.render();
+				.addExtraButton((button) => button.setIcon("trash-2").setTooltip("移除项目").onClick(() => {
+					void this.plugin.removeProject(project.id).then((removed) => {
+						if (removed) this.render();
+					});
 				}));
 		}
 		container.createEl("h3", { text: "最近任务" });

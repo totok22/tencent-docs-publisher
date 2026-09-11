@@ -219,18 +219,18 @@ async function credentialFingerprint(token: string): Promise<string> {
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: ReturnType<typeof window.setTimeout> | undefined;
 	try {
 		return await Promise.race([
 			promise,
 			new Promise<T>((_resolve, reject) => {
-				timer = setTimeout(
+				timer = (typeof window !== "undefined" ? window.setTimeout : setTimeout)(
 					() => reject(new PublisherError("腾讯文档请求超时。", "TIMEOUT", "request", undefined, true)),
 					timeoutMs,
 				);
 			}),
 		]);
 	} finally {
-		if (timer !== undefined) clearTimeout(timer);
+		if (timer !== undefined) (typeof window !== "undefined" ? window.clearTimeout : clearTimeout)(timer);
 	}
 }

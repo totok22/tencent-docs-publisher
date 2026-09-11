@@ -1,6 +1,6 @@
 # 腾讯文档发布器 (Tencent Docs Publisher)
 
-[English](./README_EN.md) | 简体中文
+[English](./README.md) | 简体中文
 
 将 Obsidian 中的 Markdown 笔记与知识树发布到腾讯智能文档。
 

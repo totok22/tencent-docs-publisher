@@ -1,3 +1,4 @@
+import { ConfirmationModal } from "./ui/confirmation-modal";
 import { Menu, Notice, Plugin, TFile, TFolder, type MenuItem } from "obsidian";
 import { migrateData } from "./domain/publish-state";
 import { bindingsFromSelections } from "./domain/page-binding";
@@ -140,13 +141,22 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		if (project?.remoteUrl) window.open(project.remoteUrl);
 	}
 
-	async removeProject(projectId: string): Promise<void> {
-		if (!window.confirm("确认移除该本地发布项目？")) return;
-		this.data.projects = this.data.projects.filter((project) => project.id !== projectId);
-		delete this.data.remoteTreeCaches[projectId];
-		this.rebuildProjectIndex();
-		await this.savePluginData();
-		new Notice("已移除本地发布项目。");
+	removeProject(projectId: string): Promise<boolean> {
+		const modal = new ConfirmationModal(
+			this.app,
+			"移除项目",
+			"确认移除该本地发布项目？腾讯文档云端内容不会被删除。",
+			"移除",
+			async () => {
+				this.data.projects = this.data.projects.filter((project) => project.id !== projectId);
+				delete this.data.remoteTreeCaches[projectId];
+				this.rebuildProjectIndex();
+				await this.savePluginData();
+				new Notice("已移除本地发布项目。");
+			},
+		);
+		modal.open();
+		return modal.result;
 	}
 
 	private registerCommands(): void {

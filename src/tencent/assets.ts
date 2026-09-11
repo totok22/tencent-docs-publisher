@@ -119,5 +119,5 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
 }
 
 function defaultDelay(milliseconds: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, milliseconds));
+	return new Promise((resolve) => (typeof window !== "undefined" ? window.setTimeout : setTimeout)(resolve, milliseconds));
 }

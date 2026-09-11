@@ -21,7 +21,7 @@ export class ProgressModal extends Modal {
 		this.titleEl.setText("正在发布到腾讯文档");
 		this.statusEl = this.contentEl.createEl("p", { text: "正在准备…" });
 		new Setting(this.contentEl).addButton((button) =>
-			button.setWarning().setButtonText("停止（当前页面写完后）").onClick(() => {
+			button.setDestructive().setButtonText("停止（当前页面写完后）").onClick(() => {
 				this.controller.abort();
 				button.setDisabled(true).setButtonText("正在停止…");
 			}),

@@ -50,4 +50,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title="$GITHUB_REF_NAME" \
             --draft \
+            --generate-notes \
             main.js manifest.json styles.css
