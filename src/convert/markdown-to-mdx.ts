@@ -11,6 +11,14 @@ export interface MarkdownAsset {
 	target: string;
 	resolvedPath: string | null;
 	label: string;
+	/** Obsidian 的 `|468` 缩放语法解析出的显示尺寸，不是说明文字。 */
+	width?: number;
+	height?: number;
+}
+
+export interface AssetSize {
+	width: number;
+	height?: number;
 }
 
 export interface MarkdownConversion {
@@ -59,10 +67,15 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 	text = text.replace(/==([^=\n]+)==/g, '<Mark backgroundColor="yellow">$1</Mark>');
 	text = stripEmptyHeadings(text, warnings);
 
-	const addAsset = (kind: AssetKind, target: string, label: string): string => {
+	const addAsset = (kind: AssetKind, target: string, label: string, size: AssetSize | null = null): string => {
 		const cleanTarget = target.split("#")[0] ?? target;
 		const index = assets.length;
-		assets.push({ index, kind, target, resolvedPath: options.resolvePath(cleanTarget), label });
+		const asset: MarkdownAsset = { index, kind, target, resolvedPath: options.resolvePath(cleanTarget), label };
+		if (size) {
+			asset.width = size.width;
+			if (size.height !== undefined) asset.height = size.height;
+		}
+		assets.push(asset);
 		return `${ASSET_PREFIX}${index}${ASSET_SUFFIX}`;
 	};
 
@@ -78,11 +91,15 @@ export function convertMarkdownToMdx(markdown: string, options: MarkdownConversi
 	text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_whole, alt: string, target: string) => {
 		if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return _whole;
 		if (!isImage(target)) return _whole;
-		return addAsset("image", target, alt || fileLabel(target));
+		const sized = splitTrailingSize(alt);
+		return addAsset("image", target, sized.label || fileLabel(target), sized.size);
 	});
 	text = text.replace(/!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (whole: string, target: string, alias?: string) => {
 		const embedded = whole.startsWith("!");
-		if (isImage(target)) return addAsset("image", target, alias ?? fileLabel(target));
+		if (isImage(target)) {
+			const size = parseSizeHint(alias);
+			return addAsset("image", target, size ? fileLabel(target) : alias ?? fileLabel(target), size);
+		}
 		if (isPdf(target)) return addAsset("pdf", target, alias ?? fileLabel(target));
 		if (embedded) {
 			if (!options.embeddedMarkdownAsPage) warnings.push(`Markdown 嵌入“${target}”无法展开，已按文字占位。`);
@@ -172,7 +189,7 @@ export function applyResolvedAssets(
 		const url = resolved[index];
 		if (!asset || !url) throw new Error(`资源 ${index} 尚未解析。`);
 		return asset.kind === "image"
-			? `<Image src="${escapeAttribute(url)}" alt="${escapeAttribute(asset.label)}" />`
+			? `<Image src="${escapeAttribute(url)}" alt="${escapeAttribute(asset.label)}"${asset.width ? ` width="${asset.width}"` : ""}${asset.height ? ` height="${asset.height}"` : ""} />`
 			: `[${escapeMarkdownLabel(asset.label)}](${url.replace(/\s/g, "%20")})`;
 	});
 }
@@ -302,6 +319,29 @@ function splitCells(row: string): string[] {
 
 function isImage(target: string): boolean {
 	return /\.(?:png|jpe?g|gif|bmp|webp|svg)(?:#.*)?$/i.test(target);
+}
+
+/**
+ * Obsidian 用 `![[图片.png|468]]` 这样的数字后缀表示显示宽度，这个数字只是缩放参数，
+ * 不是图片说明。识别出来之后它不会再当说明文字，而是转成腾讯 Image 的 width/height。
+ */
+function parseSizeHint(value: string | undefined): AssetSize | null {
+	if (!value) return null;
+	const match = /^(\d+)(?:\s*[x×]\s*(\d+))?$/.exec(value.trim());
+	if (!match) return null;
+	const width = Number.parseInt(match[1] ?? "", 10);
+	if (!Number.isFinite(width) || width <= 0) return null;
+	const heightText = match[2];
+	if (!heightText) return { width };
+	const height = Number.parseInt(heightText, 10);
+	return Number.isFinite(height) && height > 0 ? { width, height } : null;
+}
+
+/** 说明文字末尾的 `|468` 同样是缩放参数，返回真正的说明文字和尺寸。 */
+function splitTrailingSize(alt: string): { label: string; size: AssetSize | null } {
+	const match = /^(.*?)\|\s*(\d+(?:\s*[x×]\s*\d+)?)\s*$/.exec(alt);
+	if (!match) return { label: alt, size: null };
+	return { label: (match[1] ?? "").trim(), size: parseSizeHint(match[2]) };
 }
 
 function isPdf(target: string): boolean {

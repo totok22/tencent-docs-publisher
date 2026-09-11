@@ -9,8 +9,13 @@ export class ObsidianLocalPageRepository implements LocalPageRepository {
 		if (!(abstract instanceof TFile) || abstract.extension !== "md") {
 			throw new Error(`Markdown 文件不存在：${path}`);
 		}
-		await this.vault.cachedRead(abstract);
-		const cache = this.metadataCache.getFileCache(abstract);
+		let cache = this.metadataCache.getFileCache(abstract);
+		if (!cache) {
+			// Most vaults already have metadata here. Only pay for a file read during
+			// the uncommon cache warm-up window instead of rereading every page.
+			await this.vault.cachedRead(abstract);
+			cache = this.metadataCache.getFileCache(abstract);
+		}
 		const frontmatter = cache?.frontmatter;
 		const title = typeof frontmatter?.title === "string" && frontmatter.title.trim()
 			? frontmatter.title.trim()
@@ -19,7 +24,12 @@ export class ObsidianLocalPageRepository implements LocalPageRepository {
 		const links: LocalLink[] = [];
 		for (const link of cache?.links ?? []) links.push(this.resolveLink(link, abstract.path, false));
 		for (const embed of cache?.embeds ?? []) links.push(this.resolveLink(embed, abstract.path, true));
-		return { path: abstract.path, title, aliases, links: links.sort((a, b) => a.position - b.position) };
+		return {
+			path: abstract.path,
+			title,
+			aliases,
+			links: links.sort((a, b) => a.position - b.position),
+		};
 	}
 
 	private resolveLink(link: LinkCache, sourcePath: string, isEmbed: boolean): LocalLink {

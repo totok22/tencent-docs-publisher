@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-09-11
+
+### Changed
+
+- Make menus and command checks use indexed project lookups, avoid rewriting unchanged plugin data during startup, and let the interface render a progress notice before longer operations.
+- Reuse fresh remote page snapshots during whole-tree preflight instead of immediately reading every bound page a second time, and avoid unnecessary Vault reads when metadata is already cached.
+
+### Fixed
+
+- Treat the number in an Obsidian image size hint (`![[photo.png|514]]`) as a size, not as a caption: it no longer shows up as text under the image, and it becomes the Tencent `<Image>` width. A `514x300` hint sets both values.
+- Compute the proportional height from the image's own pixel size when only a width is given. Tencent keeps whatever width/height it receives and otherwise falls back to the intrinsic height, which stretched the image.
+- Correctly detect SVG files whose opening tag contains attributes, and reject malformed or zero-sized image dimensions.
+
 ## [0.1.10] - 2026-09-11
 
 ### Fixed

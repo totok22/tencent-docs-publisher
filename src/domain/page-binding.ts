@@ -79,13 +79,14 @@ export function bindingsFromProposals(
 	existing: PublishProject["pageMap"],
 ): PublishProject["pageMap"] {
 	const output: PublishProject["pageMap"] = { ...existing };
+	const proposalsByPath = new Map(proposals.map((proposal) => [proposal.localPath, proposal]));
 	for (const proposal of proposals) {
 		if (proposal.status !== "matched" || !proposal.remotePageId || !proposal.remoteTitle) continue;
 		const previous = existing[proposal.localPath];
 		output[proposal.localPath] = {
 			pageId: proposal.remotePageId,
 			parentPageId: proposal.parentLocalPath
-				? proposals.find((candidate) => candidate.localPath === proposal.parentLocalPath)?.remotePageId ?? null
+				? proposalsByPath.get(proposal.parentLocalPath)?.remotePageId ?? null
 				: null,
 			localTitle: proposal.localTitle,
 			remoteTitle: proposal.remoteTitle,

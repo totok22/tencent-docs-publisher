@@ -27,12 +27,14 @@ describe("mocked end-to-end publish", () => {
 			extra: '<Page id="extra"><Paragraph id="extra-old">hands off</Paragraph></Page>',
 		};
 		const insertOrder: string[] = [];
+		const readsBeforePublish: string[] = [];
 		const client = {
 			async callToolJson<T>(name: string, args?: Record<string, unknown>): Promise<T> {
 				if (name === "smartcanvas.get_top_level_pages") return { pages: [{ page_id: "root", title: "Root" }] } as T;
 				if (name === "manage.query_file_info") return { type: "smartcanvas", title: "Root", url: "https://docs.qq.com/doc/test" } as T;
 				if (name === "smartcanvas.read") {
 					const pageId = String(args?.page_id);
+					readsBeforePublish.push(pageId);
 					const content = remote[pageId] ?? "";
 					const split = content.indexOf('<Paragraph id="root-old-20">');
 					if (pageId === "root" && split >= 0 && !args?.next_token) {
@@ -76,6 +78,8 @@ describe("mocked end-to-end publish", () => {
 		expect(preflight.blockers).toEqual([]);
 		expect(preflight.pages).toHaveLength(3);
 		expect(data.remoteTreeCaches.project?.nodes.extra?.title).toBe("Remote only");
+		expect(readsBeforePublish.filter((pageId) => pageId === "child")).toHaveLength(1);
+		expect(readsBeforePublish.filter((pageId) => pageId === "grand")).toHaveLength(1);
 
 		const result = await executeProjectPublish(preflight, reader, client, data, async () => undefined);
 		expect(result.published).toEqual(["docs/grand.md", "docs/child.md", "docs/root.md"]);

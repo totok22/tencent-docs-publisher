@@ -5,6 +5,8 @@ import type { RemotePageNode } from "../types";
 export interface RemoteTreeResult {
 	rootPageId: string;
 	nodes: Record<string, RemotePageNode>;
+	/** Fresh page snapshots used by the same operation; never persisted in plugin data. */
+	contents: Record<string, string>;
 	warnings: string[];
 }
 
@@ -16,6 +18,7 @@ export async function discoverRemotePageTree(
 	maxDepth = 32,
 ): Promise<RemoteTreeResult> {
 	const nodes: Record<string, RemotePageNode> = {};
+	const contents: Record<string, string> = {};
 	const warnings: string[] = [];
 	const seen = new Set<string>();
 
@@ -30,6 +33,7 @@ export async function discoverRemotePageTree(
 			return;
 		}
 		const read = await readCompletePage(client, fileId, pageId);
+		contents[pageId] = read.content;
 		const parsed = parseRemoteMdx(read.content, pageId);
 		const children = parsed.directChildPages;
 		nodes[pageId] = {
@@ -43,7 +47,7 @@ export async function discoverRemotePageTree(
 	}
 
 	await visit(rootPageId, rootTitle, null, 0);
-	return { rootPageId, nodes, warnings };
+	return { rootPageId, nodes, contents, warnings };
 }
 
 export async function resolveRemoteDocumentRoot(

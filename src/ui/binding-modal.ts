@@ -30,14 +30,17 @@ export class BindingModal extends Modal {
 			});
 		}
 		const selections: Record<string, string> = {};
+		const proposalsByPath = new Map(this.proposals.map((proposal) => [proposal.localPath, proposal]));
+		const depths = new Map<string, number>();
+		const remoteNodes = Object.values(this.remoteNodes);
 		for (const proposal of this.proposals) {
-			const depth = pathDepth(proposal.localPath, this.proposals);
+			const depth = pathDepth(proposal.localPath, proposalsByPath, depths);
 			const setting = new Setting(this.contentEl)
 				.setName("　".repeat(depth) + statusIcon(proposal.status) + " " + proposal.localTitle)
 				.setDesc(proposal.localPath + "\n" + PROPOSAL_LABEL[proposal.status]);
 			setting.addDropdown((dropdown) => {
 				dropdown.addOption("", "（未绑定）");
-				for (const node of Object.values(this.remoteNodes)) dropdown.addOption(node.pageId, node.title);
+				for (const node of remoteNodes) dropdown.addOption(node.pageId, node.title);
 				if (proposal.remotePageId) {
 					dropdown.setValue(proposal.remotePageId);
 					selections[proposal.localPath] = proposal.remotePageId;
@@ -49,7 +52,7 @@ export class BindingModal extends Modal {
 			});
 		}
 		const initiallyBound = new Set(this.proposals.map((proposal) => proposal.remotePageId).filter(Boolean));
-		const unbound = Object.values(this.remoteNodes).filter((node) => !initiallyBound.has(node.pageId));
+		const unbound = remoteNodes.filter((node) => !initiallyBound.has(node.pageId));
 		if (unbound.length) {
 			this.contentEl.createEl("h3", { text: "腾讯文档里多出来的页面（发布不会动它们）" });
 			for (const node of unbound) this.contentEl.createEl("p", { text: "○ " + node.title + "（" + node.pageId + "）" });
@@ -71,13 +74,20 @@ export class BindingModal extends Modal {
 	}
 }
 
-function pathDepth(path: string, proposals: BindingProposal[]): number {
+function pathDepth(
+	path: string,
+	proposalsByPath: ReadonlyMap<string, BindingProposal>,
+	depths: Map<string, number>,
+): number {
+	const cached = depths.get(path);
+	if (cached !== undefined) return cached;
 	let depth = 0;
-	let parent = proposals.find((proposal) => proposal.localPath === path)?.parentLocalPath ?? null;
+	let parent = proposalsByPath.get(path)?.parentLocalPath ?? null;
 	while (parent) {
 		depth += 1;
-		parent = proposals.find((proposal) => proposal.localPath === parent)?.parentLocalPath ?? null;
+		parent = proposalsByPath.get(parent)?.parentLocalPath ?? null;
 	}
+	depths.set(path, depth);
 	return depth;
 }
 

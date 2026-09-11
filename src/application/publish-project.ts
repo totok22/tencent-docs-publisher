@@ -57,7 +57,17 @@ export async function prepareProjectPreflight(
 	const nodes = flatten(localTree.root);
 	const pages: PagePreflight[] = [];
 	for (const node of nodes) {
-		pages.push(await preflightPage(reader, project, node.path, "refreshed", client, data.remoteTreeCaches[project.id], embeddedMarkdownAsPage));
+		const pageId = project.pageMap[node.path]?.pageId;
+		pages.push(await preflightPage(
+			reader,
+			project,
+			node.path,
+			"refreshed",
+			client,
+			data.remoteTreeCaches[project.id],
+			embeddedMarkdownAsPage,
+			pageId ? refreshed.remoteContents[pageId] : undefined,
+		));
 	}
 	const blockers = pages
 		.filter((page) => ["error", "unbound", "conflict"].includes(page.status))
@@ -79,7 +89,7 @@ export async function prepareProjectPreflight(
 		pages,
 		blockers,
 		budget: {
-			pageReadsAtLeast: pages.length * 2,
+			pageReadsAtLeast: Object.keys(refreshed.remoteContents).length,
 			pageWritesAtLeast: changed.length,
 			uniqueImages,
 			changedPdfs,

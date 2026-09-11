@@ -8,6 +8,7 @@ export interface RefreshBindingsResult {
 	localTree: LocalTreeResult;
 	proposals: BindingProposal[];
 	cache: RemoteTreeCache;
+	remoteContents: Record<string, string>;
 	remoteUrl: string;
 }
 
@@ -30,6 +31,7 @@ export async function refreshBindings(
 		localTree,
 		proposals,
 		cache: { projectId: project.id, fetchedAt: new Date().toISOString(), nodes: remoteTree.nodes },
+		remoteContents: remoteTree.contents,
 		remoteUrl: root.remoteUrl,
 	};
 }

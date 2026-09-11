@@ -1,12 +1,13 @@
 import { convertMarkdownToMdx, type MarkdownAsset, type MarkdownConversion } from "../convert/markdown-to-mdx";
 import { parseRemoteMdx, remoteContentFingerprint, type ParsedRemotePage } from "../convert/remote-mdx-parser";
+import { readImageDimensions } from "../convert/image-size";
 import { sha256Hex } from "../domain/hash";
 import { isWithinRoot } from "../domain/local-page-tree";
 import { readCompletePage, type ToolJsonCaller } from "../tencent/smartcanvas";
 import type { PublishProject, RemotePageBinding, RemoteTreeCache } from "../types";
 import { describeUnwritablePage, planContentPlacement } from "./content-placement";
 
-export const CONVERTER_VERSION = "0.4.2";
+export const CONVERTER_VERSION = "0.4.3";
 
 export interface PreflightVaultReader {
 	readMarkdown(path: string): Promise<string>;
@@ -44,6 +45,7 @@ export async function preflightPage(
 	client?: ToolJsonCaller,
 	cache?: RemoteTreeCache,
 	embeddedMarkdownAsPage = project.embeddedMarkdownAsPage ?? false,
+	freshRemoteContent?: string,
 ): Promise<PagePreflight> {
 	const binding = project.pageMap[localPath];
 	const sourceMarkdown = await reader.readMarkdown(localPath);
@@ -68,7 +70,18 @@ export async function preflightPage(
 		if (asset.kind === "image" && bytes.byteLength > 10 * 1024 * 1024) {
 			errors.push(`图片超过 10 MB：${asset.resolvedPath}`);
 		}
-		assets.push({ ...asset, contentHash: await sha256Hex(bytes), size: bytes.byteLength });
+		const prepared: PreparedAsset = { ...asset, contentHash: await sha256Hex(bytes), size: bytes.byteLength };
+		if (asset.kind === "image" && asset.width !== undefined && asset.height === undefined) {
+			// Obsidian 的 |514 只给宽度；腾讯会原样保留 width/height，所以这里按原图比例补上高度，避免拉伸。
+			const intrinsic = readImageDimensions(bytes);
+			if (intrinsic?.width) {
+				const height = Math.max(1, Math.round((intrinsic.height * asset.width) / intrinsic.width));
+				// 渲染直接读 conversion.assets，所以高度要写回原对象，不能只改副作用副本。
+				asset.height = height;
+				prepared.height = height;
+			}
+		}
+		assets.push(prepared);
 	}
 	const sourceHash = await sha256Hex(JSON.stringify({
 		markdown,
@@ -85,10 +98,10 @@ export async function preflightPage(
 	if (mode === "refreshed") {
 		if (!client) throw new Error("刷新后预检需要腾讯文档客户端。");
 		try {
-			const read = await readCompletePage(client, project.remoteFileId, binding.pageId);
-			remoteContent = read.content;
-			parsedRemote = parseRemoteMdx(read.content, binding.pageId);
-			remoteHash = await remoteContentFingerprint(read.content, binding.pageId);
+			remoteContent = freshRemoteContent ??
+				(await readCompletePage(client, project.remoteFileId, binding.pageId)).content;
+			parsedRemote = parseRemoteMdx(remoteContent, binding.pageId);
+			remoteHash = await remoteContentFingerprint(remoteContent, binding.pageId);
 			remoteFresh = true;
 			if (parsedRemote.hasUnsafeSyntax) errors.push("远端页面包含无法安全解析的 MDX，已阻止写入。");
 			const unwritable = describeUnwritablePage(project, { localPath, conversion, parsedRemote });

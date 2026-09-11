@@ -1,6 +1,7 @@
 import { Menu, Notice, Plugin, TFile, TFolder, type MenuItem } from "obsidian";
 import { migrateData } from "./domain/publish-state";
 import { bindingsFromSelections } from "./domain/page-binding";
+import { ProjectIndex } from "./domain/project-index";
 import { discoverLocalPageTree } from "./domain/local-page-tree";
 import { refreshBindings } from "./application/refresh-bindings";
 import { preflightPage } from "./application/preflight";
@@ -25,6 +26,7 @@ import { OverviewPickerModal } from "./ui/overview-picker-modal";
 import { PROJECT_VIEW_TYPE, ProjectView } from "./ui/project-view";
 import {
 	COMMAND_IDS,
+	DATA_SCHEMA_VERSION,
 	type PublishProject,
 	type TencentDocsPublisherData,
 } from "./types";
@@ -32,11 +34,13 @@ import {
 export default class TencentDocsPublisherPlugin extends Plugin {
 	data!: TencentDocsPublisherData;
 	tokenStore!: TencentTokenStore;
+	private readonly projectIndex = new ProjectIndex();
 
 	async onload(): Promise<void> {
-		this.data = migrateData(await this.loadData());
+		const rawData: unknown = await this.loadData();
+		this.data = migrateData(rawData);
+		this.rebuildProjectIndex();
 		this.tokenStore = new TencentTokenStore(this.app);
-		await this.savePluginData();
 
 		if (this.data.showRibbonIcon) {
 			this.addRibbonIcon("cloud-upload", "腾讯文档发布：打开发布管理", () => {
@@ -48,6 +52,12 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		this.registerMenus();
 		this.registerView(PROJECT_VIEW_TYPE, (leaf) => new ProjectView(leaf, this));
 		this.addSettingTab(new TencentDocsSettingTab(this.app, this));
+
+		// Current-version data was already normalized in memory. Rewriting a large
+		// cache on every startup delays plugin availability without changing data.
+		if (persistedSchemaVersion(rawData) !== DATA_SCHEMA_VERSION) {
+			await this.savePluginData();
+		}
 	}
 
 	async savePluginData(): Promise<void> {
@@ -98,7 +108,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	openBindingManager(projectId?: string): void {
-		const project = projectId ? this.data.projects.find((item) => item.id === projectId) : undefined;
+		const project = projectId ? this.projectIndex.projectById(projectId) : undefined;
 		if (project) {
 			void this.refreshAndOpenBinding(project);
 			return;
@@ -116,17 +126,17 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	previewProject(projectId: string): void {
-		const project = this.data.projects.find((item) => item.id === projectId);
+		const project = this.projectIndex.projectById(projectId);
 		if (project) void this.showTreePreview(project, "quick", false);
 	}
 
 	publishProject(projectId: string): void {
-		const project = this.data.projects.find((item) => item.id === projectId);
+		const project = this.projectIndex.projectById(projectId);
 		if (project) void this.showTreePreview(project, "refreshed", true);
 	}
 
 	openProjectDocument(projectId: string): void {
-		const project = this.data.projects.find((item) => item.id === projectId);
+		const project = this.projectIndex.projectById(projectId);
 		if (project?.remoteUrl) window.open(project.remoteUrl);
 	}
 
@@ -134,6 +144,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		if (!window.confirm("只移除本地的发布项目？腾讯文档不会被删除。")) return;
 		this.data.projects = this.data.projects.filter((project) => project.id !== projectId);
 		delete this.data.remoteTreeCaches[projectId];
+		this.rebuildProjectIndex();
 		await this.savePluginData();
 		new Notice("已移除本地发布项目，腾讯文档没有改动。");
 	}
@@ -204,7 +215,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 						this.addMenuItem(menu, "腾讯文档：在腾讯文档中打开", "external-link", () => this.openRemoteForFile(file));
 					}
 				} else if (file instanceof TFolder) {
-					const project = this.data.projects.find((item) => item.allowedRootPath === file.path);
+					const project = this.projectIndex.projectForAllowedRoot(file.path);
 					this.addMenuItem(menu, "腾讯文档：用这个文件夹新建发布项目…", "folder-tree", () => this.createProjectFromFolder(file));
 					if (project) {
 						this.addMenuItem(menu, "腾讯文档：检查并发布这个项目", "cloud-upload", () => this.publishProject(project.id));
@@ -253,10 +264,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	private projectForPath(path: string): PublishProject | undefined {
-		return this.data.projects.find(
-			(project) =>
-				project.sourceRootPath === path || Object.prototype.hasOwnProperty.call(project.pageMap, path),
-		);
+		return this.projectIndex.projectForPath(path);
 	}
 
 	private publishCurrentPage(): void {
@@ -360,10 +368,12 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			pageMap: {},
 		};
 		this.data.projects.push(project);
+		this.rebuildProjectIndex();
 		try {
 			await this.refreshAndOpenBinding(project);
 		} catch (error) {
 			this.data.projects = this.data.projects.filter((item) => item.id !== project.id);
+			this.rebuildProjectIndex();
 			throw error;
 		}
 	}
@@ -423,6 +433,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 	}
 
 	private async refreshAndOpenBinding(project: PublishProject): Promise<void> {
+		const loading = new Notice("正在读取本地与腾讯文档页面树…", 0);
+		await yieldToUi();
 		try {
 			const repository = new ObsidianLocalPageRepository(this.app.vault, this.app.metadataCache);
 			const result = await refreshBindings(project, repository, this.createClient(), project.embeddedMarkdownAsPage ?? this.data.defaults.embeddedMarkdownAsPage);
@@ -432,6 +444,7 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			if (rootId) project.remoteRootPageId = rootId;
 			new BindingModal(this.app, result.proposals, result.cache.nodes, async (selections) => {
 				project.pageMap = bindingsFromSelections(result.proposals, selections, result.cache.nodes, project.pageMap);
+				this.rebuildProjectIndex();
 				await this.savePluginData();
 				new Notice("绑定已保存，还没有发布。");
 			}).open();
@@ -439,6 +452,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 		} catch (error) {
 			new Notice(error instanceof Error ? error.message : "无法刷新远端页面树。");
 			throw error;
+		} finally {
+			loading.hide();
 		}
 	}
 
@@ -452,6 +467,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			new Notice("需要先确认 token 可用：请在设置里点一次「测试连接」。");
 			return;
 		}
+		const loading = new Notice(mode === "refreshed" ? "正在读取并检查页面…" : "正在生成本地预览…", 0);
+		await yieldToUi();
 		try {
 			const reader = new ObsidianVaultReader(this.app.vault, this.app.metadataCache);
 			const client = mode === "refreshed" ? this.createClient() : undefined;
@@ -494,6 +511,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			} : undefined).open();
 		} catch (error) {
 			new Notice(error instanceof Error ? error.message : "无法生成预览。");
+		} finally {
+			loading.hide();
 		}
 	}
 
@@ -506,6 +525,8 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			new Notice("需要先确认 token 可用：请在设置里点一次「测试连接」。");
 			return;
 		}
+		const loading = new Notice(mode === "refreshed" ? "正在读取并检查文档树…" : "正在生成本地文档树预览…", 0);
+		await yieldToUi();
 		try {
 			const repository = new ObsidianLocalPageRepository(this.app.vault, this.app.metadataCache);
 			const reader = new ObsidianVaultReader(this.app.vault, this.app.metadataCache);
@@ -586,7 +607,13 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 			} : undefined, summary).open();
 		} catch (error) {
 			new Notice(error instanceof Error ? error.message : "无法生成发布预览。");
+		} finally {
+			loading.hide();
 		}
+	}
+
+	private rebuildProjectIndex(): void {
+		this.projectIndex.rebuild(this.data.projects);
 	}
 
 	/** 把预检预算翻译成一句人话，说明这次发布会做什么。 */
@@ -632,4 +659,18 @@ export default class TencentDocsPublisherPlugin extends Plugin {
 function stringField(record: Record<string, unknown>, keys: string[]): string | undefined {
 	for (const key of keys) if (typeof record[key] === "string" && record[key]) return record[key];
 	return undefined;
+}
+
+function persistedSchemaVersion(raw: unknown): number | null {
+	return typeof raw === "object" && raw !== null && !Array.isArray(raw) &&
+		typeof (raw as Record<string, unknown>).schemaVersion === "number"
+		? (raw as Record<string, unknown>).schemaVersion as number
+		: null;
+}
+
+function yieldToUi(): Promise<void> {
+	const targetWindow = window.activeWindow;
+	return new Promise((resolve) => targetWindow.requestAnimationFrame(() => {
+		targetWindow.requestAnimationFrame(() => resolve());
+	}));
 }

@@ -27,6 +27,26 @@ describe("Markdown conversion", () => {
 		expect(validateGeneratedMdx(resolved)).toEqual([]);
 	});
 
+
+	it("treats an Obsidian image size suffix as a size hint instead of a caption", () => {
+		const conversion = convertMarkdownToMdx("![[photo.png|514]]\n\n![[photo.png|514x300]]\n\n![[photo.png|说明文字]]\n\n![图注|300](photo.png)", {
+			resolvePath: () => "photo.png",
+		});
+		expect(conversion.assets.map((asset) => [asset.label, asset.width, asset.height])).toEqual([
+			["图注", 300, undefined],
+			["photo.png", 514, undefined],
+			["photo.png", 514, 300],
+			["说明文字", undefined, undefined],
+		]);
+		const resolved = applyResolvedAssets(conversion, { 0: "https://img", 1: "https://img", 2: "https://img", 3: "https://img" });
+		expect(resolved).toContain('<Image src="https://img" alt="photo.png" width="514" />');
+		expect(resolved).toContain('<Image src="https://img" alt="photo.png" width="514" height="300" />');
+		expect(resolved).toContain('<Image src="https://img" alt="说明文字" />');
+		expect(resolved).toContain('<Image src="https://img" alt="图注" width="300" />');
+		expect(resolved).not.toContain('alt="514"');
+		expect(validateGeneratedMdx(resolved)).toEqual([]);
+	});
+
 	it("escapes prose braces while allowing braces in Markdown math and code", () => {
 		const conversion = convertMarkdownToMdx("字面量 {value}\n\n行内 $R_{test}$\n\n`const x = {a: 1}`", {
 			resolvePath: () => null,
@@ -80,6 +100,19 @@ describe("read-only preflight", () => {
 		expect(result.status).toBe("changed");
 		expect(result.remoteFresh).toBe(false);
 		expect(result.assets[0]?.size).toBe(3);
+	});
+
+
+	it("computes a proportional height for an Obsidian image width hint", async () => {
+		const png = pngBytes(419, 92);
+		const reader = fixtureReader("![[a.png|514]]\n\n![[a.png]]", { "a.png": png });
+		const result = await preflightPage(reader, fixtureProject(), "index.md", "quick");
+		expect(result.assets.map((asset) => [asset.width, asset.height])).toEqual([
+			[514, 113],
+			[undefined, undefined],
+		]);
+		const mdx = applyResolvedAssets(result.conversion, { 0: "https://img/a.png", 1: "https://img/a.png" });
+		expect(mdx).toContain('<Image src="https://img/a.png" alt="a.png" width="514" height="113" />');
 	});
 
 	it("detects remote fingerprint conflicts only after a complete refreshed read", async () => {
@@ -487,6 +520,16 @@ describe("single page publishing", () => {
 	});
 });
 
+function pngBytes(width: number, height: number): ArrayBuffer {
+	const bytes = new Uint8Array(24);
+	bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+	new DataView(bytes.buffer).setUint32(8, 13);
+	bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+	const view = new DataView(bytes.buffer);
+	view.setUint32(16, width);
+	view.setUint32(20, height);
+	return bytes.buffer;
+}
 function fixtureReader(markdown: string, binaries: Record<string, ArrayBuffer> = {}): PreflightVaultReader {
 	return {
 		async readMarkdown() { return markdown; },

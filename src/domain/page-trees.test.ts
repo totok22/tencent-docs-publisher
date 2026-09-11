@@ -86,6 +86,7 @@ describe("remote page tree", () => {
 		expect(result.nodes.root?.childPageIds).toEqual(["a", "b"]);
 		expect(result.nodes.a?.childPageIds).toEqual(["a1"]);
 		expect(Object.keys(result.nodes).sort()).toEqual(["a", "a1", "b", "root"]);
+		expect(result.contents).toEqual(content);
 	});
 
 	it("resolves root Page ID and title while ignoring mixed children arrays", async () => {
